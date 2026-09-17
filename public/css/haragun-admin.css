@@ -1,0 +1,679 @@
+/* Haragun Admin — тёмный сайдбар/топбар, светлый контент */
+
+:root {
+    --haragun-navy: #0b0e14;
+    --haragun-bar: #121826;
+    --haragun-bar-2: #161c2d;
+    --haragun-blue: #4b4ded;
+    --haragun-page: #e8ebf4;
+    --haragun-surface: #ffffff;
+    --haragun-text: #1a1f2c;
+    --haragun-muted: #6b7280;
+    --haragun-line: rgba(18, 24, 38, 0.08);
+    --haragun-radius: 1rem;
+}
+
+html,
+body.fi-body,
+.fi-body {
+    background: var(--haragun-page) !important;
+    color: var(--haragun-text) !important;
+}
+
+.fi-main-ctn,
+.fi-main,
+.fi-page,
+.fi-page-content,
+.fi-main > * {
+    background: transparent !important;
+    color: var(--haragun-text) !important;
+}
+
+.fi-main {
+    padding-inline: 1.35rem !important;
+    padding-block: 1rem !important;
+}
+
+/* ===== Сайдбар ===== */
+.fi-sidebar.fi-main-sidebar,
+.fi-main-sidebar {
+    background: linear-gradient(180deg, #161c2d 0%, #121826 55%, #0f1420 100%) !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+
+.fi-sidebar-header,
+.fi-sidebar-header-ctn {
+    background: transparent !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.fi-sidebar .fi-logo,
+.fi-sidebar .fi-logo-text,
+.fi-sidebar-header a,
+.fi-sidebar-header span {
+    color: #ffffff !important;
+}
+
+.fi-sidebar .fi-sidebar-group-label,
+.fi-sidebar .fi-sidebar-item-btn,
+.fi-sidebar .fi-sidebar-item-label,
+.fi-sidebar .fi-icon,
+.fi-sidebar svg {
+    color: rgba(255, 255, 255, 0.78) !important;
+}
+
+.fi-sidebar .fi-sidebar-item.fi-active > .fi-sidebar-item-btn,
+.fi-sidebar .fi-sidebar-item.fi-sidebar-item-has-active-child-items > .fi-sidebar-item-btn,
+.fi-sidebar .fi-sidebar-item.fi-sidebar-item-has-url > .fi-sidebar-item-btn:hover,
+.fi-sidebar .fi-sidebar-item.fi-sidebar-item-has-url > .fi-sidebar-item-btn:focus,
+.fi-sidebar .fi-sidebar-item.fi-sidebar-item-has-url > .fi-sidebar-item-btn:focus-visible,
+.fi-sidebar .fi-sidebar-group-btn:hover,
+.fi-sidebar .fi-sidebar-group-btn:focus,
+.fi-sidebar .fi-sidebar-group-btn:focus-visible {
+    background: transparent !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
+}
+
+.fi-sidebar .fi-sidebar-item.fi-active > .fi-sidebar-item-btn,
+.fi-sidebar .fi-sidebar-item.fi-sidebar-item-has-url > .fi-sidebar-item-btn:hover {
+    background: rgba(75, 77, 237, 0.28) !important;
+    background-color: rgba(75, 77, 237, 0.28) !important;
+    color: #ffffff !important;
+}
+
+.fi-sidebar .fi-sidebar-item.fi-active > .fi-sidebar-item-btn {
+    box-shadow: inset 3px 0 0 #4b4ded !important;
+}
+
+.fi-sidebar .fi-sidebar-item.fi-active > .fi-sidebar-item-btn > .fi-icon,
+.fi-sidebar .fi-sidebar-item.fi-active > .fi-sidebar-item-btn > .fi-sidebar-item-label,
+.fi-sidebar .fi-sidebar-item.fi-active > .fi-sidebar-item-btn svg {
+    color: #ffffff !important;
+}
+
+.haragun-nav-label {
+    padding: 0.35rem 1rem 0.85rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.4);
+}
+
+/* ===== Топбар ===== */
+.fi-topbar-ctn,
+.fi-topbar {
+    background: #121826 !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+
+.fi-topbar .fi-logo,
+.fi-topbar .fi-logo-text,
+.fi-topbar a,
+.fi-topbar button,
+.fi-topbar span,
+.fi-topbar svg {
+    color: #ffffff !important;
+}
+
+.fi-topbar .fi-global-search,
+.fi-topbar .fi-global-search-field,
+.fi-topbar .fi-global-search-ctn {
+    display: none !important;
+}
+
+.fi-topbar .fi-dropdown-panel,
+.fi-topbar .fi-dropdown-list {
+    background: #161c2d !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* ===== Заголовки страниц ===== */
+.fi-header {
+    margin-bottom: 1rem !important;
+}
+
+.fi-header-heading,
+.fi-header h1 {
+    letter-spacing: -0.03em !important;
+    font-weight: 700 !important;
+}
+
+.fi-breadcrumbs {
+    opacity: 0.85;
+}
+
+/* ===== Виджеты ===== */
+.fi-wi-stats-overview {
+    gap: 1rem !important;
+}
+
+.fi-wi-stats-overview-stat,
+.fi-account-widget,
+.fi-wi-widget.fi-account-widget {
+    background: var(--haragun-surface) !important;
+    border: 1px solid var(--haragun-line) !important;
+    border-radius: var(--haragun-radius) !important;
+    box-shadow: 0 10px 28px rgba(18, 24, 38, 0.05) !important;
+    color: var(--haragun-text) !important;
+    padding: 1.15rem 1.25rem !important;
+}
+
+.fi-wi-stats-overview-stat:hover {
+    border-color: rgba(75, 77, 237, 0.24) !important;
+    box-shadow: 0 14px 32px rgba(75, 77, 237, 0.1) !important;
+    transform: translateY(-1px);
+}
+
+.fi-section,
+.fi-wi-widget:not(.fi-account-widget),
+.fi-fo-tabs,
+.fi-resource-list-records-page,
+.fi-page-header-main,
+.fi-fo-component-ctn {
+    color: var(--haragun-text) !important;
+}
+
+.fi-wi-widget:not(.fi-account-widget),
+.fi-fo-tabs,
+.fi-resource-list-records-page,
+.fi-page-header-main {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* ===== Таблицы ===== */
+.fi-ta-ctn {
+    background: var(--haragun-surface) !important;
+    border-radius: var(--haragun-radius) !important;
+    box-shadow: 0 10px 28px rgba(18, 24, 38, 0.05) !important;
+    border: 1px solid var(--haragun-line) !important;
+    color: var(--haragun-text) !important;
+    overflow: hidden !important;
+}
+
+.fi-ta-header,
+.fi-ta-header-ctn {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+}
+
+.fi-ta-header-toolbar {
+    background: transparent !important;
+    border-bottom: 1px solid var(--haragun-line) !important;
+    padding: 0.85rem 1.1rem !important;
+    gap: 0.75rem !important;
+}
+
+.fi-ta-search-field {
+    width: min(20rem, 100%);
+}
+
+.fi-ta-search-field .fi-input-wrp {
+    background: #f4f5fa !important;
+    border-radius: 0.75rem !important;
+    box-shadow: inset 0 0 0 1px rgba(18, 24, 38, 0.1) !important;
+    min-height: 2.5rem !important;
+}
+
+.fi-ta-search-field .fi-input,
+.fi-ta-search-field input.fi-input {
+    background: transparent !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+}
+
+.fi-ta-search-field .fi-input-wrp:focus-within {
+    background: #ffffff !important;
+    box-shadow:
+        inset 0 0 0 1px rgba(75, 77, 237, 0.55),
+        0 0 0 3px rgba(75, 77, 237, 0.14) !important;
+}
+
+.fi-ta-search-field .fi-icon {
+    color: var(--haragun-muted) !important;
+}
+
+.fi-ta-content,
+.fi-ta-table,
+.fi-ta {
+    background: transparent !important;
+    color: var(--haragun-text) !important;
+}
+
+.fi-ta-header-cell,
+.fi-ta-header-cell * {
+    background: #f7f8fc !important;
+    color: var(--haragun-muted) !important;
+    border-bottom: 1px solid var(--haragun-line) !important;
+    font-size: 0.78rem !important;
+    font-weight: 650 !important;
+    letter-spacing: 0.02em !important;
+    text-transform: uppercase !important;
+}
+
+.fi-ta-row,
+.fi-ta-cell {
+    background: transparent !important;
+    border-color: var(--haragun-line) !important;
+    color: var(--haragun-text) !important;
+}
+
+.fi-ta-row {
+    transition: background 0.15s ease !important;
+}
+
+.fi-ta-row:hover {
+    background: rgba(75, 77, 237, 0.045) !important;
+}
+
+.fi-ta-actions .fi-link,
+.fi-ta-actions a,
+.fi-ta-actions .fi-btn {
+    font-weight: 600 !important;
+    color: var(--haragun-blue) !important;
+}
+
+.fi-ta-actions .fi-link.fi-color-danger,
+.fi-ta-actions .fi-link.fi-color-danger *,
+.fi-ta-actions .fi-color-danger,
+.fi-ta-actions .fi-color-danger *,
+.fi-ta-actions .fi-btn-danger,
+.fi-ta-actions .fi-btn-danger * {
+    color: #e11d48 !important;
+}
+
+.fi-ta-footer {
+    background: #fafbfe !important;
+    border-top: 1px solid var(--haragun-line) !important;
+    padding: 0 !important;
+}
+
+/* ===== Выбор строк в таблице ===== */
+.fi-ta-selection-indicator {
+    background: rgba(75, 77, 237, 0.07) !important;
+    border-bottom: 1px solid rgba(75, 77, 237, 0.16) !important;
+    padding: 0.75rem 1.1rem !important;
+    gap: 0.75rem !important;
+}
+
+.fi-ta-selection-indicator > :nth-child(1) {
+    color: var(--haragun-text) !important;
+    font-size: 0.9rem !important;
+    font-weight: 650 !important;
+}
+
+.fi-ta-selection-indicator-actions-ctn {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 0.5rem !important;
+}
+
+.fi-ta-selection-indicator .fi-link {
+    display: inline-flex !important;
+    align-items: center !important;
+    min-height: 2.15rem !important;
+    padding: 0.35rem 0.85rem !important;
+    border-radius: 0.65rem !important;
+    background: #ffffff !important;
+    box-shadow: inset 0 0 0 1px rgba(75, 77, 237, 0.28) !important;
+    color: var(--haragun-blue) !important;
+    font-size: 0.8125rem !important;
+    font-weight: 650 !important;
+    text-decoration: none !important;
+}
+
+.fi-ta-selection-indicator .fi-link:hover {
+    background: rgba(75, 77, 237, 0.08) !important;
+}
+
+.fi-ta-selection-indicator .fi-link.fi-color-danger {
+    box-shadow: inset 0 0 0 1px rgba(225, 29, 72, 0.28) !important;
+    color: #e11d48 !important;
+}
+
+.fi-ta-selection-indicator .fi-link.fi-color-danger:hover {
+    background: rgba(225, 29, 72, 0.08) !important;
+}
+
+/* ===== Пагинация ===== */
+.fi-pagination {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 0.85rem !important;
+    width: 100% !important;
+    padding: 0.9rem 1.1rem !important;
+    background: transparent !important;
+    grid-template-columns: none !important;
+}
+
+.fi-pagination-overview {
+    display: inline !important;
+    color: var(--haragun-muted) !important;
+    font-size: 0.875rem !important;
+    font-weight: 500 !important;
+    order: 1;
+}
+
+.fi-pagination-records-per-page-select-ctn {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 0.5rem !important;
+    order: 2;
+    margin-inline-start: auto !important;
+    color: var(--haragun-muted) !important;
+    font-size: 0.875rem !important;
+}
+
+.fi-pagination-records-per-page-select.fi-compact {
+    display: none !important;
+}
+
+.fi-pagination-records-per-page-select:not(.fi-compact) {
+    display: inline-flex !important;
+    align-items: center !important;
+}
+
+.fi-pagination-records-per-page-select .fi-input-wrp {
+    background: #ffffff !important;
+    border-radius: 0.75rem !important;
+    box-shadow: inset 0 0 0 1px rgba(18, 24, 38, 0.1) !important;
+    min-height: 2.5rem !important;
+}
+
+.fi-pagination-records-per-page-select .fi-select-input,
+.fi-pagination-records-per-page-select select,
+.fi-pagination-records-per-page-select .fi-input {
+    min-width: 3.5rem !important;
+    background: transparent !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    color: var(--haragun-text) !important;
+}
+
+.fi-pagination-records-per-page-select .fi-input-wrp-label {
+    color: var(--haragun-muted) !important;
+    font-weight: 500 !important;
+    white-space: nowrap !important;
+}
+
+.fi-pagination-previous-btn,
+.fi-pagination-next-btn {
+    display: inline-flex !important;
+    order: 3;
+    border-radius: 0.65rem !important;
+    background: #ffffff !important;
+    box-shadow: inset 0 0 0 1px rgba(18, 24, 38, 0.1) !important;
+    color: var(--haragun-text) !important;
+}
+
+.fi-pagination-previous-btn:hover,
+.fi-pagination-next-btn:hover {
+    background: rgba(75, 77, 237, 0.06) !important;
+    box-shadow: inset 0 0 0 1px rgba(75, 77, 237, 0.25) !important;
+}
+
+.fi-pagination-items {
+    display: flex !important;
+    order: 4;
+    align-items: center !important;
+    overflow: hidden !important;
+    border-radius: 0.75rem !important;
+    background: #ffffff !important;
+    box-shadow: inset 0 0 0 1px rgba(18, 24, 38, 0.1) !important;
+}
+
+.fi-pagination-item {
+    border-color: rgba(18, 24, 38, 0.08) !important;
+}
+
+.fi-pagination-item-btn {
+    min-width: 2.25rem !important;
+    min-height: 2.25rem !important;
+    justify-content: center !important;
+    color: var(--haragun-text) !important;
+}
+
+.fi-pagination-item-btn:hover {
+    background: rgba(75, 77, 237, 0.06) !important;
+}
+
+.fi-pagination-item.fi-active .fi-pagination-item-btn {
+    background: var(--haragun-blue) !important;
+}
+
+.fi-pagination-item.fi-active .fi-pagination-item-label,
+.fi-pagination-item.fi-active .fi-pagination-item-btn,
+.fi-pagination-item.fi-active .fi-icon {
+    color: #ffffff !important;
+}
+
+.fi-pagination-item-label {
+    color: var(--haragun-text) !important;
+    font-weight: 600 !important;
+}
+
+.fi-wi-stats-overview-stat-value,
+.fi-header-heading,
+.fi-header h1,
+.fi-section-header-heading,
+.fi-breadcrumbs,
+.fi-breadcrumbs *,
+.fi-ta-empty-state-heading,
+.fi-fo-field-wrp-label,
+.fi-fo-field-wrp-label span {
+    color: var(--haragun-text) !important;
+}
+
+.fi-wi-stats-overview-stat-value {
+    font-size: 1.75rem !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.03em !important;
+}
+
+.fi-wi-stats-overview-stat-description,
+.fi-ta-empty-state-description {
+    color: var(--haragun-muted) !important;
+}
+
+.fi-account-widget .fi-btn,
+.fi-account-widget button.fi-btn {
+    background: rgba(75, 77, 237, 0.08) !important;
+    color: var(--haragun-blue) !important;
+    border: 1px solid rgba(75, 77, 237, 0.16) !important;
+    box-shadow: none !important;
+    border-radius: 0.7rem !important;
+}
+
+.fi-account-widget .fi-btn:hover {
+    background: rgba(75, 77, 237, 0.14) !important;
+}
+
+.fi-btn-primary,
+button.fi-btn.fi-color-primary {
+    background: var(--haragun-blue) !important;
+    color: #ffffff !important;
+    box-shadow: 0 8px 18px rgba(75, 77, 237, 0.28) !important;
+    border-radius: 0.75rem !important;
+}
+
+.fi-btn-primary:hover {
+    background: #3d3fd6 !important;
+}
+
+.fi-btn:not(.fi-btn-primary):not(.fi-color-primary) {
+    border-radius: 0.75rem !important;
+}
+
+.fi-input,
+.fi-select-input,
+.fi-textarea,
+input.fi-input,
+select.fi-select-input {
+    background: transparent !important;
+    color: var(--haragun-text) !important;
+    box-shadow: none !important;
+}
+
+.fi-input-wrp {
+    background: #ffffff !important;
+    border-radius: 0.75rem !important;
+    box-shadow: inset 0 0 0 1px rgba(18, 24, 38, 0.12) !important;
+    color: var(--haragun-text) !important;
+    min-height: 2.6rem !important;
+    overflow: visible !important;
+}
+
+.fi-fo-select,
+.fi-select-input,
+.fi-select-input-ctn {
+    overflow: visible !important;
+}
+
+.fi-select-input .fi-dropdown-panel {
+    z-index: 50 !important;
+    max-width: none !important;
+    border-radius: 0.9rem !important;
+    background: #ffffff !important;
+    box-shadow:
+        0 12px 32px rgba(18, 24, 38, 0.12),
+        0 0 0 1px rgba(18, 24, 38, 0.08) !important;
+}
+
+.fi-select-input .fi-dropdown-list-item {
+    padding: 0.7rem 1rem !important;
+    font-size: 0.9375rem !important;
+    color: var(--haragun-text) !important;
+}
+
+.fi-select-input .fi-dropdown-list-item.fi-selected {
+    background: #f4f5fa !important;
+}
+
+.fi-input-wrp:focus-within {
+    box-shadow:
+        inset 0 0 0 1px rgba(75, 77, 237, 0.55),
+        0 0 0 3px rgba(75, 77, 237, 0.14) !important;
+}
+
+.fi-input::placeholder,
+input.fi-input::placeholder {
+    color: rgba(26, 31, 44, 0.4) !important;
+}
+
+/* ===== Формы create/edit ===== */
+.fi-sc-form {
+    gap: 1.25rem !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+}
+
+.fi-resource-create-record-page .fi-sc-form,
+.fi-resource-edit-record-page .fi-sc-form,
+.fi-resource-view-record-page .fi-sc-form,
+.fi-resource-view-record-page .fi-page-content > .fi-sc {
+    width: 100% !important;
+    max-width: 80rem !important;
+    margin-inline: auto !important;
+}
+
+.fi-resource-create-record-page .fi-sc-form .fi-section,
+.fi-resource-edit-record-page .fi-sc-form .fi-section,
+.fi-resource-view-record-page .fi-sc-form .fi-section,
+.fi-resource-view-record-page .fi-page-content .fi-section {
+    grid-column: 1 / -1 !important;
+    width: 100% !important;
+    max-width: none !important;
+}
+
+.fi-section:not(.fi-section-not-contained):not(.fi-aside) {
+    background: var(--haragun-surface) !important;
+    border: 1px solid var(--haragun-line) !important;
+    border-radius: var(--haragun-radius) !important;
+    box-shadow: 0 10px 28px rgba(18, 24, 38, 0.05) !important;
+    overflow: visible !important;
+}
+
+.fi-section-header {
+    background: transparent !important;
+    padding: 1.1rem 1.35rem !important;
+    border-bottom: 1px solid var(--haragun-line) !important;
+}
+
+.fi-section-header-heading {
+    font-size: 1.05rem !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.02em !important;
+}
+
+.fi-section-header-description {
+    color: var(--haragun-muted) !important;
+    margin-top: 0.2rem !important;
+}
+
+.fi-section-content-ctn,
+.fi-section-content {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+}
+
+.fi-section-content {
+    padding: 1.25rem 1.35rem !important;
+}
+
+.fi-fo-field {
+    margin-bottom: 0.35rem;
+}
+
+.fi-fo-field-label-content,
+.fi-fo-field-wrp-label,
+.fi-fo-field-wrp-label span {
+    font-weight: 600 !important;
+    color: var(--haragun-text) !important;
+}
+
+.fi-fo-toggle {
+    justify-content: flex-start !important;
+}
+
+.fi-form-actions,
+.fi-ac-form-actions,
+.fi-page-main-actions,
+.fi-header-actions {
+    gap: 0.65rem !important;
+}
+
+.fi-form-actions .fi-btn,
+.fi-ac-form-actions .fi-btn,
+.fi-page-main-actions .fi-btn {
+    border-radius: 0.75rem !important;
+    font-weight: 600 !important;
+    padding-inline: 1rem !important;
+}
+
+.fi-form-actions .fi-btn:not(.fi-color-primary),
+.fi-ac-form-actions .fi-btn:not(.fi-color-primary),
+.fi-page-main-actions .fi-btn:not(.fi-color-primary) {
+    background: #ffffff !important;
+    color: var(--haragun-text) !important;
+    box-shadow: inset 0 0 0 1px rgba(18, 24, 38, 0.12) !important;
+}
+
+.fi-form-actions .fi-btn:not(.fi-color-primary):hover,
+.fi-ac-form-actions .fi-btn:not(.fi-color-primary):hover,
+.fi-page-main-actions .fi-btn:not(.fi-color-primary):hover {
+    background: #f5f6fb !important;
+    box-shadow: inset 0 0 0 1px rgba(75, 77, 237, 0.28) !important;
+}
+
+/* Логин переопределяется инлайн-стилем в HEAD_START */
