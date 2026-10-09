@@ -20,7 +20,6 @@ class CoffeeProductCardResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'price' => $this->price,
-            'price_label' => $this->priceLabel(),
             'image_url' => $this->publicImageUrl(),
             'background_color' => $this->background_color,
             'is_popular' => $this->is_popular,

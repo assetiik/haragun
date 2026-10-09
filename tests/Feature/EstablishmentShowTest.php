@@ -87,23 +87,27 @@ class EstablishmentShowTest extends TestCase
         $response
             ->assertOk()
             ->assertJsonPath('establishment.name', 'Ледовая арена Haragun')
-            ->assertJsonPath('establishment.status_label', 'Открыто до 22:00')
-            ->assertJsonPath('establishment.ice_status_label', '-9 °C, лёд свежий')
+            ->assertJsonPath('establishment.is_open', true)
+            ->assertJsonPath('establishment.closes_at', '22:00')
+            ->assertJsonPath('establishment.ice_temperature', -9)
+            ->assertJsonPath('establishment.ice_note', 'лёд свежий')
             ->assertJsonPath('establishment.parking_is_free', true)
             ->assertJsonPath('selected_category.slug', 'ice_rental')
             ->assertJsonPath('selected_category.section_title', 'Входной билет')
             ->assertJsonPath('selected_date', '2026-09-14')
             ->assertJsonPath('products.0.name', 'Взрослый')
             ->assertJsonPath('products.0.price', 2500)
-            ->assertJsonPath('products.0.subtitle', '2 500 ₸ · от 13 лет')
-            ->assertJsonCount(5, 'dates')
-            ->assertJsonPath('dates.0.weekday_short', 'пн')
-            ->assertJsonPath('dates.0.day', 14);
+            ->assertJsonPath('products.0.meta', 'от 13 лет')
+            ->assertJsonCount(30, 'dates')
+            ->assertJsonPath('dates.0.date', '2026-09-14')
+            ->assertJsonPath('dates.0.weekday', 1)
+            ->assertJsonPath('dates.0.day', 14)
+            ->assertJsonPath('dates.29.date', '2026-10-13');
 
         $slots = collect($response->json('slots'));
         $this->assertTrue($slots->contains(fn (array $slot) => $slot['time'] === '10:00' && $slot['is_available'] === false));
         $this->assertTrue($slots->contains(fn (array $slot) => $slot['time'] === '16:00' && $slot['is_available'] === true));
-        $this->assertStringContainsString('парковка бесплатная', $response->json('establishment.location_meta'));
+        $this->assertTrue($response->json('establishment.parking_is_free'));
     }
 
     public function test_show_can_switch_to_foodcourt_category_without_slots(): void
@@ -141,7 +145,7 @@ class EstablishmentShowTest extends TestCase
             ->assertOk()
             ->assertJsonPath('selected_category.slug', 'foodcourt')
             ->assertJsonPath('selected_category.is_foodcourt', true)
-            ->assertJsonPath('sections.0.title', 'Напитки')
+            ->assertJsonPath('sections.0.key', 'Напитки')
             ->assertJsonPath('products.0.name', 'Капучино')
             ->assertJsonPath('dates', [])
             ->assertJsonPath('slots', [])
@@ -169,7 +173,6 @@ class EstablishmentShowTest extends TestCase
             ->assertOk()
             ->assertJsonPath('establishment.latitude', null)
             ->assertJsonPath('establishment.longitude', null)
-            ->assertJsonPath('establishment.distance_km', null)
-            ->assertJsonPath('establishment.distance_label', null);
+            ->assertJsonPath('establishment.distance_km', null);
     }
 }

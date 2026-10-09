@@ -4,11 +4,13 @@ namespace App\Filament\Resources\Establishments\Tables;
 
 use App\Enums\EstablishmentType;
 use App\Filament\Support\VenueSection;
+use App\Models\Establishment;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
@@ -19,6 +21,11 @@ class EstablishmentsTable
         return $table
             ->defaultSort('sort_order')
             ->columns([
+                ImageColumn::make('image_url')
+                    ->label('Фото')
+                    ->getStateUsing(fn (Establishment $record): ?string => $record->publicImageUrl())
+                    ->circular()
+                    ->toggleable(),
                 TextColumn::make('name')
                     ->label('Название')
                     ->searchable()
@@ -31,6 +38,12 @@ class EstablishmentsTable
                     ->label('Адрес')
                     ->searchable()
                     ->limit(40),
+                TextColumn::make('latitude')
+                    ->label('Lat')
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('longitude')
+                    ->label('Lon')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('type')
                     ->label('Тип')
                     ->badge()

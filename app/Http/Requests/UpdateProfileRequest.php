@@ -12,12 +12,13 @@ class UpdateProfileRequest extends FormRequest
     }
 
     /**
-     * @return array<string, array<int, string>>
+     * @return array<string, array<int, mixed>>
      */
     public function rules(): array
     {
         return [
-            'name' => ['required', 'string', 'max:50'],
+            'name' => ['sometimes', 'required', 'string', 'max:50'],
+            'notifications_enabled' => ['sometimes', 'boolean'],
         ];
     }
 
@@ -29,6 +30,7 @@ class UpdateProfileRequest extends FormRequest
         return [
             'name.required' => 'Укажите имя.',
             'name.max' => 'Имя не должно быть длиннее 50 символов.',
+            'notifications_enabled.boolean' => 'Уведомления должны быть true или false.',
         ];
     }
 }

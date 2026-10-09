@@ -4,11 +4,14 @@ namespace App\Models;
 
 use App\Enums\OrderStatus;
 use App\Enums\OrderType;
+use App\Observers\OrderObserver;
 use App\Support\Money;
+use App\Support\StoredUrl;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Database\Factories\OrderFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -17,6 +20,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
+#[ObservedBy([OrderObserver::class])]
 #[Fillable([
     'user_id',
     'establishment_id',
@@ -156,6 +160,92 @@ class Order extends Model
     public function totalLabel(): string
     {
         return Money::format($this->total);
+    }
+
+    public function placedAt(): CarbonInterface
+    {
+        return $this->paid_at ?? $this->accepted_at ?? $this->created_at;
+    }
+
+    public function dateLabel(): string
+    {
+        $at = $this->placedAt();
+
+        if ($at->isToday()) {
+            return 'Сегодня';
+        }
+
+        if ($at->isYesterday()) {
+            return 'Вчера';
+        }
+
+        $months = [
+            1 => 'января',
+            2 => 'февраля',
+            3 => 'марта',
+            4 => 'апреля',
+            5 => 'мая',
+            6 => 'июня',
+            7 => 'июля',
+            8 => 'августа',
+            9 => 'сентября',
+            10 => 'октября',
+            11 => 'ноября',
+            12 => 'декабря',
+        ];
+
+        return $at->day.' '.$months[$at->month];
+    }
+
+    public function timeLabel(): string
+    {
+        return $this->placedAt()->format('H:i');
+    }
+
+    public function datetimeLabel(): string
+    {
+        $at = $this->placedAt();
+
+        $months = [
+            1 => 'января',
+            2 => 'февраля',
+            3 => 'марта',
+            4 => 'апреля',
+            5 => 'мая',
+            6 => 'июня',
+            7 => 'июля',
+            8 => 'августа',
+            9 => 'сентября',
+            10 => 'октября',
+            11 => 'ноября',
+            12 => 'декабря',
+        ];
+
+        return $at->day.' '.$months[$at->month].' '.$at->year.', '.$at->format('H:i');
+    }
+
+    public function metaLabel(): string
+    {
+        return collect([
+            $this->dateLabel(),
+            $this->timeLabel(),
+            $this->summary_short,
+        ])->filter()->implode(' · ');
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function thumbnails(): array
+    {
+        return $this->items
+            ->where('is_discount', false)
+            ->map(fn (OrderItem $item) => StoredUrl::public($item->image_url ?? $item->product?->image_url))
+            ->filter()
+            ->unique()
+            ->take(5)
+            ->values()
+            ->all();
     }
 
     public function numberLabel(): string

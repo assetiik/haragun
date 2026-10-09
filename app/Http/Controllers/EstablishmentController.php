@@ -61,9 +61,9 @@ class EstablishmentController extends Controller
             if ($selectedCategory->isFoodCourt()) {
                 $products = $selectedCategory->products()->food()->active()->ordered()->get();
                 $sections = $products
-                    ->groupBy(fn (Product $product) => $product->food_section ?: 'Меню')
-                    ->map(fn ($items, $title) => [
-                        'title' => $title,
+                    ->groupBy(fn (Product $product) => $product->food_section ?: 'default')
+                    ->map(fn ($items, $key) => [
+                        'key' => $key,
                         'products' => FoodProductResource::collection($items->values()),
                     ])
                     ->values()

@@ -3,7 +3,6 @@
 namespace App\Http\Resources;
 
 use App\Models\OrderItem;
-use App\Support\Money;
 use App\Support\StoredUrl;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -23,12 +22,10 @@ class OrderItemResource extends JsonResource
             'product_id' => $this->product_id,
             'kind' => $this->kind,
             'name' => $this->name,
-            'title' => $this->title(),
             'subtitle' => $this->subtitle,
             'quantity' => $this->quantity,
             'unit_price' => $this->unit_price,
             'amount' => $this->amount,
-            'amount_label' => Money::format($this->amount),
             'sizes' => $this->sizes ?? [],
             'icon_key' => $this->icon_key,
             'image_url' => StoredUrl::public($this->image_url),

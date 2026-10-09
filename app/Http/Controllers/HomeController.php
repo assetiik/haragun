@@ -6,10 +6,12 @@ use App\Enums\EstablishmentType;
 use App\Http\Resources\BannerResource;
 use App\Http\Resources\BrandResource;
 use App\Http\Resources\CityResource;
+use App\Http\Resources\PromoTileResource;
 use App\Http\Resources\UserResource;
 use App\Models\Banner;
 use App\Models\Brand;
 use App\Models\City;
+use App\Models\PromoTile;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -30,11 +32,7 @@ class HomeController extends Controller
             ? City::query()->active()->findOrFail($validated['city_id'])
             : City::query()->active()->ordered()->first();
 
-        if ($city === null) {
-            return response()->json([
-                'message' => 'Нет доступных городов',
-            ], 404);
-        }
+        abort_if($city === null, 404);
 
         $latitude = isset($validated['lat']) ? (float) $validated['lat'] : null;
         $longitude = isset($validated['lng']) ? (float) $validated['lng'] : null;
@@ -42,7 +40,14 @@ class HomeController extends Controller
         $request->attributes->set('user_latitude', $latitude);
         $request->attributes->set('user_longitude', $longitude);
 
-        $banners = Banner::query()
+        $headerImages = Banner::query()
+            ->active()
+            ->hero()
+            ->forCity($city->id)
+            ->ordered()
+            ->get();
+
+        $promoTiles = PromoTile::query()
             ->active()
             ->forCity($city->id)
             ->ordered()
@@ -79,7 +84,8 @@ class HomeController extends Controller
             'app_name' => config('app.name'),
             'city' => new CityResource($city),
             'cities' => CityResource::collection($cities),
-            'banners' => BannerResource::collection($banners),
+            'header_images' => BannerResource::collection($headerImages),
+            'promo_tiles' => PromoTileResource::collection($promoTiles),
             'haragun' => BrandResource::collection($haragun),
             'cafes' => BrandResource::collection($cafes),
             'brands' => BrandResource::collection($brands),

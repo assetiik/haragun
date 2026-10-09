@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Resources\CoffeeProductDetailResource;
 use App\Http\Resources\FoodProductResource;
 use App\Models\Establishment;
 use App\Models\MenuCategory;
 use App\Models\Product;
-use Carbon\Carbon;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -34,7 +34,6 @@ class FoodCourtController extends Controller
 
         $date = $validated['date'] ?? now()->toDateString();
         $time = $validated['time'] ?? '16:00';
-        $sessionDate = Carbon::parse($date);
 
         $products = Product::query()
             ->where('menu_category_id', $category->id)
@@ -44,9 +43,9 @@ class FoodCourtController extends Controller
             ->get();
 
         $sections = $products
-            ->groupBy(fn (Product $product) => $product->food_section ?: 'Меню')
-            ->map(fn ($items, $title) => [
-                'title' => $title,
+            ->groupBy(fn (Product $product) => $product->food_section ?: 'default')
+            ->map(fn ($items, $key) => [
+                'key' => $key,
                 'products' => FoodProductResource::collection($items->values()),
             ])
             ->values();
@@ -64,37 +63,34 @@ class FoodCourtController extends Controller
                 'slug' => $category->slug,
             ],
             'header' => [
-                'title' => $category->header_title ?: 'Фудкорт',
-                'subtitle' => $category->header_subtitle
-                    ?: 'Заберёте у стойки — попадёт в тот же чек',
-                'color' => $category->header_color ?: '#1B2A4A',
+                'title' => $category->header_title,
+                'subtitle' => $category->header_subtitle,
+                'color' => $category->header_color,
             ],
-            'badges' => [
-                [
-                    'type' => 'status',
-                    'label' => $establishment->statusLabel(),
-                    'is_open' => $establishment->isOpenAt(),
-                ],
-                [
-                    'type' => 'prep',
-                    'label' => "Готовим за {$prepMinutes} минут",
-                    'prep_minutes' => $prepMinutes,
-                ],
-            ],
+            'is_open' => $establishment->isOpenAt(),
+            'prep_minutes' => $prepMinutes,
             'session' => [
                 'date' => $date,
                 'time' => $time,
-                'short_label' => $this->shortSessionLabel($sessionDate, $time),
             ],
             'sections' => $sections,
             'products' => FoodProductResource::collection($products),
         ]);
     }
 
-    private function shortSessionLabel(Carbon $date, string $time): string
+    public function product(Establishment $establishment, Product $product): CoffeeProductDetailResource
     {
-        $weekdays = [0 => 'вс', 1 => 'пн', 2 => 'вт', 3 => 'ср', 4 => 'чт', 5 => 'пт', 6 => 'сб'];
+        abort_unless($establishment->is_active, 404);
 
-        return "{$weekdays[$date->dayOfWeek]}, {$date->day} · {$time}";
+        $product->loadMissing('menuCategory');
+
+        abort_unless(
+            $product->establishment_id === $establishment->id
+                && $product->is_active
+                && $product->menuCategory?->isFoodCourt(),
+            404
+        );
+
+        return new CoffeeProductDetailResource($product);
     }
 }

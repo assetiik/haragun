@@ -24,17 +24,15 @@ class BrandAddressTest extends TestCase
 
         $response
             ->assertOk()
-            ->assertJsonPath('title', 'Адреса')
             ->assertJsonPath('brand.name', 'Кофейня «Москва»')
             ->assertJsonPath('addresses.0.address', 'ул. Сейфуллина 154')
-            ->assertJsonPath('addresses.0.open_label', 'Открыто')
-            ->assertJsonPath('addresses.0.hours_label', '10:00-18:00')
-            ->assertJsonPath('addresses.0.phone_formatted', '+7 777 777 77 77')
+            ->assertJsonPath('addresses.0.is_open', true)
+            ->assertJsonPath('addresses.0.opens_at', '10:00')
+            ->assertJsonPath('addresses.0.closes_at', '18:00')
+            ->assertJsonPath('addresses.0.phone', '77777777777')
             ->assertJsonPath('addresses.1.address', 'ул. Қабанбай батыр 128')
             ->assertJsonPath('selected_address_id', $first->id)
             ->assertJsonPath('selected_address.address', 'ул. Сейфуллина 154')
-            ->assertJsonPath('actions.0.label', 'Показать на карте')
-            ->assertJsonPath('actions.1.label', 'Выбрать этот адрес')
             ->assertJsonPath('map.markers.0.id', $first->id)
             ->assertJsonPath('map.markers.0.is_selected', true);
 

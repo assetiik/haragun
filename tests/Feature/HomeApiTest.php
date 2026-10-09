@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\BannerPlacement;
 use App\Enums\EstablishmentType;
 use App\Models\Banner;
 use App\Models\Brand;
@@ -9,6 +10,7 @@ use App\Models\City;
 use App\Models\Establishment;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -28,6 +30,8 @@ class HomeApiTest extends TestCase
             'city_id' => $city->id,
             'title' => '-20% на аренду коньков',
             'subtitle' => 'В будни до 17:00',
+            'placement' => BannerPlacement::Hero,
+            'image_url' => 'banners/hero.jpg',
             'sort_order' => 1,
         ]);
 
@@ -56,7 +60,9 @@ class HomeApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('app_name', config('app.name'))
             ->assertJsonPath('city.name', 'Алматы')
-            ->assertJsonPath('banners.0.title', '-20% на аренду коньков')
+            ->assertJsonPath('header_images.0.title', '-20% на аренду коньков')
+            ->assertJsonPath('header_images.0.image_url', Storage::disk('public')->url('banners/hero.jpg'))
+            ->assertJsonMissingPath('banners')
             ->assertJsonPath('brands.0.name', 'Ледовая арена Haragun')
             ->assertJsonPath('brands.0.type', 'ice_arena')
             ->assertJsonPath('brands.0.requires_address_selection', false)
@@ -129,7 +135,6 @@ class HomeApiTest extends TestCase
 
         $response->assertOk();
         $this->assertNotNull($response->json('brands.0.nearest_address.distance_km'));
-        $this->assertStringContainsString('км', $response->json('brands.0.nearest_address.distance_label'));
     }
 
     public function test_home_includes_authenticated_user(): void
@@ -146,7 +151,7 @@ class HomeApiTest extends TestCase
         $this->getJson('/api/home')
             ->assertOk()
             ->assertJsonPath('user.name', 'Аружан')
-            ->assertJsonPath('user.initials', 'А');
+            ->assertJsonPath('user.phone', '77071234567');
     }
 
     public function test_home_can_filter_by_city_id(): void

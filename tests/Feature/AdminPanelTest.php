@@ -2,9 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Enums\BannerPlacement;
 use App\Enums\EstablishmentType;
+use App\Enums\FeedbackRating;
 use App\Enums\ProductKind;
 use App\Filament\Pages\Auth\Login;
+use App\Filament\Resources\Banners\BannerResource;
+use App\Filament\Resources\Banners\Pages\CreateBanner;
 use App\Filament\Resources\Brands\BrandResource;
 use App\Filament\Resources\Cities\CityResource;
 use App\Filament\Resources\Cities\Pages\CreateCity;
@@ -16,13 +20,20 @@ use App\Filament\Resources\Establishments\Pages\ListEstablishments;
 use App\Filament\Resources\MenuCategories\Pages\CreateMenuCategory;
 use App\Filament\Resources\Modifiers\ModifierResource;
 use App\Filament\Resources\Modifiers\Pages\CreateModifier;
+use App\Filament\Resources\OrderFeedback\OrderFeedbackResource;
+use App\Filament\Resources\Orders\OrderResource;
 use App\Filament\Resources\Products\Pages\CreateProduct;
 use App\Filament\Resources\Products\Pages\ListProducts;
+use App\Filament\Resources\Users\UserResource;
 use App\Models\Admin;
+use App\Models\Banner;
+use App\Models\Brand;
 use App\Models\City;
 use App\Models\Establishment;
 use App\Models\MenuCategory;
 use App\Models\Modifier;
+use App\Models\ModifierCategory;
+use App\Models\OrderFeedback;
 use App\Models\Product;
 use App\Models\ProductSize;
 use App\Models\SkateSize;
@@ -206,6 +217,8 @@ class AdminPanelTest extends TestCase
         Livewire::test(EditEstablishment::class, ['record' => $establishment->getRouteKey()])
             ->fillForm([
                 'name' => 'Coffee Updated Point',
+                'latitude' => 43.2567000,
+                'longitude' => 76.9286000,
             ])
             ->call('save')
             ->assertHasNoFormErrors()
@@ -214,6 +227,8 @@ class AdminPanelTest extends TestCase
         $this->assertDatabaseHas('establishments', [
             'id' => $establishment->id,
             'name' => 'Coffee Updated Point',
+            'latitude' => 43.2567000,
+            'longitude' => 76.9286000,
         ]);
     }
 
@@ -250,10 +265,9 @@ class AdminPanelTest extends TestCase
         Storage::fake('public');
 
         $admin = Admin::factory()->create();
-        $cafe = Establishment::factory()->create([
+        $brand = Brand::factory()->create([
             'type' => EstablishmentType::Coffee,
             'name' => 'Кофейня «Арбат»',
-            'address' => 'ул. Жибек Жолы 64',
         ]);
         $category = MenuCategory::factory()->create([
             'establishment_id' => null,
@@ -277,15 +291,17 @@ class AdminPanelTest extends TestCase
             ->assertFormFieldIsHidden('kind')
             ->assertFormFieldIsHidden('food_section')
             ->assertFormFieldIsHidden('price')
+            ->assertFormFieldIsHidden('establishment_id')
+            ->assertFormFieldIsVisible('brand_id')
             ->assertFormFieldIsVisible('modifiers')
             ->assertFormFieldIsVisible('sizes')
-            ->assertFormFieldIsVisible('is_popular')
-            ->assertFormFieldIsVisible('is_featured')
+            ->assertFormFieldDoesNotExist('is_popular')
+            ->assertFormFieldDoesNotExist('is_featured')
             ->fillForm([
                 'name' => 'Чай зелёный',
                 'sort_order' => 1,
                 'is_active' => true,
-                'establishment_id' => $cafe->id,
+                'brand_id' => $brand->id,
                 'menu_category_id' => $category->id,
                 'image_url' => UploadedFile::fake()->image('tea.jpg', 120, 120),
                 'modifiers' => [$vanilla->id],
@@ -321,6 +337,8 @@ class AdminPanelTest extends TestCase
         $this->assertNotNull($product);
         $this->assertSame(ProductKind::Food, $product->kind);
         $this->assertNull($product->food_section);
+        $this->assertNull($product->establishment_id);
+        $this->assertSame($brand->id, $product->brand_id);
         $this->assertSame(890, $product->price);
         $this->assertSame('400 мл', $product->meta);
         $this->assertNotNull($product->image_url);
@@ -328,7 +346,8 @@ class AdminPanelTest extends TestCase
         $this->assertTrue($product->modifiers->contains($vanilla));
         $this->assertDatabaseHas('products', [
             'id' => $product->id,
-            'establishment_id' => $cafe->id,
+            'brand_id' => $brand->id,
+            'establishment_id' => null,
             'menu_category_id' => $category->id,
             'price' => 890,
         ]);
@@ -346,7 +365,7 @@ class AdminPanelTest extends TestCase
     public function test_creating_a_coffee_drink_skips_a_size_without_price(): void
     {
         $admin = Admin::factory()->create();
-        $cafe = Establishment::factory()->create([
+        $brand = Brand::factory()->create([
             'type' => EstablishmentType::Coffee,
         ]);
         $category = MenuCategory::factory()->create([
@@ -364,7 +383,7 @@ class AdminPanelTest extends TestCase
                 'name' => 'Эспрессо',
                 'sort_order' => 1,
                 'is_active' => true,
-                'establishment_id' => $cafe->id,
+                'brand_id' => $brand->id,
                 'menu_category_id' => $category->id,
                 'sizes' => [
                     [
@@ -440,7 +459,7 @@ class AdminPanelTest extends TestCase
     public function test_creating_a_haragun_cafe_drink_uses_the_arena_and_a_shared_coffee_category(): void
     {
         $admin = Admin::factory()->create();
-        $arena = Establishment::factory()->create([
+        $brand = Brand::factory()->create([
             'type' => EstablishmentType::IceArena,
             'name' => 'Ледовая арена Haragun',
         ]);
@@ -458,12 +477,14 @@ class AdminPanelTest extends TestCase
             ->test(CreateProduct::class)
             ->assertFormFieldIsHidden('kind')
             ->assertFormFieldIsHidden('food_section')
+            ->assertFormFieldIsHidden('establishment_id')
+            ->assertFormFieldIsVisible('brand_id')
             ->assertFormFieldIsVisible('sizes')
             ->fillForm([
                 'name' => 'Чай зелёный',
                 'sort_order' => 1,
                 'is_active' => true,
-                'establishment_id' => $arena->id,
+                'brand_id' => $brand->id,
                 'menu_category_id' => $category->id,
                 'sizes' => [
                     [
@@ -493,7 +514,8 @@ class AdminPanelTest extends TestCase
 
         $this->assertNotNull($product);
         $this->assertSame(ProductKind::Food, $product->kind);
-        $this->assertSame($arena->id, $product->establishment_id);
+        $this->assertNull($product->establishment_id);
+        $this->assertSame($brand->id, $product->brand_id);
         $this->assertSame($category->id, $product->menu_category_id);
         $this->assertSame(890, $product->price);
         $this->assertSame(3, ProductSize::query()->where('product_id', $product->id)->count());
@@ -502,8 +524,12 @@ class AdminPanelTest extends TestCase
     public function test_haragun_cafe_drinks_list_hides_tickets_and_foodcourt_snacks(): void
     {
         $admin = Admin::factory()->create();
+        $brand = Brand::factory()->create([
+            'type' => EstablishmentType::IceArena,
+        ]);
         $arena = Establishment::factory()->create([
             'type' => EstablishmentType::IceArena,
+            'brand_id' => $brand->id,
         ]);
         $ice = MenuCategory::factory()->create([
             'establishment_id' => $arena->id,
@@ -534,7 +560,8 @@ class AdminPanelTest extends TestCase
             'name' => 'Хот-дог Unique',
         ]);
         $drink = Product::factory()->create([
-            'establishment_id' => $arena->id,
+            'establishment_id' => null,
+            'brand_id' => $brand->id,
             'menu_category_id' => $coffee->id,
             'kind' => ProductKind::Food,
             'name' => 'Латте Unique',
@@ -564,16 +591,25 @@ class AdminPanelTest extends TestCase
             ->assertCanNotSeeTableRecords([$drink, $skates]);
     }
 
-    public function test_haragun_menu_hides_popular_and_banner_columns(): void
+    public function test_product_lists_hide_popular_and_banner_columns(): void
     {
         $admin = Admin::factory()->create();
         $arena = Establishment::factory()->create([
             'type' => EstablishmentType::IceArena,
         ]);
+        $cafeBrand = Brand::factory()->create([
+            'type' => EstablishmentType::Coffee,
+        ]);
         Product::factory()->create([
             'establishment_id' => $arena->id,
             'kind' => ProductKind::Ticket,
             'name' => 'Взрослый Unique',
+        ]);
+        Product::factory()->create([
+            'establishment_id' => null,
+            'brand_id' => $cafeBrand->id,
+            'kind' => ProductKind::Food,
+            'name' => 'Латте Unique',
         ]);
 
         $this->actingAs($admin, 'admin');
@@ -582,26 +618,11 @@ class AdminPanelTest extends TestCase
             ->test(ListProducts::class)
             ->assertDontSee('Популярн.')
             ->assertDontSee('Баннер');
-    }
-
-    public function test_cafe_drinks_list_shows_popular_and_banner_columns(): void
-    {
-        $admin = Admin::factory()->create();
-        $cafe = Establishment::factory()->create([
-            'type' => EstablishmentType::Coffee,
-        ]);
-        Product::factory()->create([
-            'establishment_id' => $cafe->id,
-            'kind' => ProductKind::Food,
-            'name' => 'Латте Unique',
-        ]);
-
-        $this->actingAs($admin, 'admin');
 
         Livewire::withQueryParams(['tab' => 'cafes'])
             ->test(ListProducts::class)
-            ->assertSee('Популярн.')
-            ->assertSee('Баннер');
+            ->assertDontSee('Популярн.')
+            ->assertDontSee('Баннер');
     }
 
     public function test_creating_a_haragun_ticket_hides_kind_and_section(): void
@@ -693,8 +714,8 @@ class AdminPanelTest extends TestCase
             ->test(CreateProduct::class)
             ->assertFormFieldIsHidden('kind')
             ->assertFormFieldIsHidden('food_section')
-            ->assertFormFieldIsHidden('is_popular')
-            ->assertFormFieldIsHidden('is_featured')
+            ->assertFormFieldDoesNotExist('is_popular')
+            ->assertFormFieldDoesNotExist('is_featured')
             ->assertFormFieldIsVisible('price')
             ->assertFormFieldIsVisible('skateSizes')
             ->fillForm([
@@ -777,6 +798,10 @@ class AdminPanelTest extends TestCase
         Storage::fake('public');
 
         $admin = Admin::factory()->create();
+        $category = ModifierCategory::factory()->create([
+            'name' => 'Топпинги',
+            'slug' => 'toppings',
+        ]);
 
         $this->actingAs($admin, 'admin');
 
@@ -785,6 +810,7 @@ class AdminPanelTest extends TestCase
                 'name' => 'Карамель',
                 'sort_order' => 1,
                 'is_active' => true,
+                'modifier_category_id' => $category->id,
                 'price' => 1250,
                 'image_url' => UploadedFile::fake()->image('caramel.jpg', 120, 120),
             ])
@@ -796,8 +822,81 @@ class AdminPanelTest extends TestCase
 
         $this->assertNotNull($modifier);
         $this->assertSame(1250, $modifier->price);
+        $this->assertSame($category->id, $modifier->modifier_category_id);
         $this->assertTrue($modifier->is_active);
         $this->assertNotNull($modifier->image_url);
         Storage::disk('public')->assertExists($modifier->image_url);
+    }
+
+    public function test_creating_a_banner_stores_an_uploaded_photo(): void
+    {
+        Storage::fake('public');
+
+        $admin = Admin::factory()->create();
+        $city = City::factory()->create([
+            'name' => 'Алматы',
+        ]);
+
+        $this->actingAs($admin, 'admin');
+
+        Livewire::test(CreateBanner::class)
+            ->fillForm([
+                'title' => '-20% на аренду коньков',
+                'subtitle' => 'В будни до 17:00',
+                'sort_order' => 1,
+                'is_active' => true,
+                'city_id' => $city->id,
+                'image_url' => UploadedFile::fake()->image('banner.jpg', 320, 160),
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors()
+            ->assertRedirect(BannerResource::getUrl('index'));
+
+        $banner = Banner::query()->where('title', '-20% на аренду коньков')->first();
+
+        $this->assertNotNull($banner);
+        $this->assertSame($city->id, $banner->city_id);
+        $this->assertSame(BannerPlacement::Hero, $banner->placement);
+        $this->assertNotNull($banner->image_url);
+        Storage::disk('public')->assertExists($banner->image_url);
+    }
+
+    public function test_orders_feedback_and_clients_lists_hide_create(): void
+    {
+        $admin = Admin::factory()->create();
+
+        $this->actingAs($admin, 'admin');
+
+        $this->get(OrderResource::getUrl())
+            ->assertOk()
+            ->assertDontSee(OrderResource::getUrl('create'), false);
+
+        $this->get(OrderFeedbackResource::getUrl())
+            ->assertOk()
+            ->assertDontSee(OrderFeedbackResource::getUrl('create'), false);
+
+        $this->get(UserResource::getUrl())
+            ->assertOk()
+            ->assertDontSee(UserResource::getUrl('create'), false);
+    }
+
+    public function test_order_feedback_list_renders_array_tags(): void
+    {
+        $admin = Admin::factory()->create();
+
+        OrderFeedback::factory()->create([
+            'rating' => FeedbackRating::Negative,
+            'likes' => ['taste'],
+            'dislikes' => ['underheated', 'overheated'],
+            'comment' => 'Холодный кофе',
+        ]);
+
+        $this->actingAs($admin, 'admin')
+            ->get(OrderFeedbackResource::getUrl())
+            ->assertOk()
+            ->assertSee('Вкус')
+            ->assertSee('Недогрели')
+            ->assertSee('Перегрели')
+            ->assertSee('Холодный кофе');
     }
 }

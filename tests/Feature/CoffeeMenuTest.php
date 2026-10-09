@@ -4,10 +4,12 @@ namespace Tests\Feature;
 
 use App\Enums\EstablishmentType;
 use App\Enums\ProductKind;
+use App\Models\Brand;
 use App\Models\City;
 use App\Models\Establishment;
 use App\Models\MenuCategory;
 use App\Models\Modifier;
+use App\Models\ModifierCategory;
 use App\Models\Product;
 use App\Models\ProductSize;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -29,15 +31,15 @@ class CoffeeMenuTest extends TestCase
             ->assertJsonPath('header.address', 'ул. Сейфуллина 154')
             ->assertJsonPath('selected_category', 'popular')
             ->assertJsonPath('categories.0.slug', 'popular')
-            ->assertJsonPath('categories.0.name', 'Популярные')
             ->assertJsonPath('categories.1.slug', 'tea')
             ->assertJsonPath('categories.2.slug', 'coffee')
             ->assertJsonPath('categories.3.slug', 'lemonade')
             ->assertJsonPath('featured.id', $latte->id)
             ->assertJsonPath('featured.name', 'Латте')
-            ->assertJsonPath('featured.price_label', '1 690 ₸')
+            ->assertJsonPath('featured.price', 1690)
             ->assertJsonPath('products.0.name', 'Латте')
-            ->assertJsonPath('cart.label', 'Корзина · 0 шт');
+            ->assertJsonPath('cart.items_count', 0)
+            ->assertJsonPath('cart.total', 0);
 
         $this->assertCount(3, $response->json('products'));
     }
@@ -81,13 +83,19 @@ class CoffeeMenuTest extends TestCase
             ->assertJsonPath('background_color', '#C8A45D')
             ->assertJsonPath('sizes.1.code', 'M')
             ->assertJsonPath('sizes.1.is_default', true)
+            ->assertJsonPath('selection_mode', 'coffee')
+            ->assertJsonPath('kind', 'food')
             ->assertJsonPath('modifiers.0.id', $caramel->id)
             ->assertJsonPath('modifiers.0.name', 'Карамель')
-            ->assertJsonPath('modifiers.0.price_label', '+1 250 ₸')
-            ->assertJsonPath('modifier_groups.0.name', 'Добавки')
-            ->assertJsonPath('modifier_groups.0.slug', 'extras')
+            ->assertJsonPath('modifiers.0.price', 1250)
+            ->assertJsonPath('modifier_groups.0.name', 'Топпинги')
+            ->assertJsonPath('modifier_groups.0.slug', 'toppings')
             ->assertJsonPath('modifier_groups.0.modifiers.0.id', $caramel->id)
-            ->assertJsonPath('modifier_groups.0.modifiers.0.price_label', '+1 250 ₸');
+            ->assertJsonPath('modifier_groups.0.modifiers.0.price', 1250)
+            ->assertJsonPath('modifier_groups.1.name', 'Молоко')
+            ->assertJsonPath('modifier_groups.1.slug', 'milk')
+            ->assertJsonPath('modifier_groups.2.name', 'Сиропы')
+            ->assertJsonPath('modifier_groups.2.slug', 'syrups');
     }
 
     public function test_quote_rejects_a_modifier_that_is_not_on_the_product(): void
@@ -120,7 +128,6 @@ class CoffeeMenuTest extends TestCase
             ->assertOk()
             ->assertJsonPath('unit_price', 3140)
             ->assertJsonPath('total', 6280)
-            ->assertJsonPath('total_label', '6 280 ₸')
             ->assertJsonPath('quantity', 2)
             ->assertJsonPath('modifiers.0.name', 'Карамель');
     }
@@ -161,6 +168,42 @@ class CoffeeMenuTest extends TestCase
         $this->assertNotContains('Хот-дог', collect($response->json('products'))->pluck('name')->all());
     }
 
+    public function test_ice_arena_foodcourt_product_show_returns_quantity_mode(): void
+    {
+        [$arena] = $this->seedCoffeeMenu(EstablishmentType::IceArena);
+        $foodcourt = MenuCategory::factory()->create([
+            'establishment_id' => $arena->id,
+            'type' => EstablishmentType::IceArena,
+            'slug' => 'foodcourt',
+            'name' => 'Фудкорт',
+        ]);
+        $hotDog = Product::factory()->create([
+            'establishment_id' => $arena->id,
+            'menu_category_id' => $foodcourt->id,
+            'kind' => ProductKind::Food,
+            'name' => 'Хот-дог',
+            'price' => 1500,
+            'description' => 'с кетчупом',
+            'food_section' => 'Перекус',
+        ]);
+
+        $this->getJson("/api/establishments/{$arena->id}/menu/products/{$hotDog->id}")
+            ->assertOk()
+            ->assertJsonPath('name', 'Хот-дог')
+            ->assertJsonPath('kind', 'food')
+            ->assertJsonPath('selection_mode', 'quantity')
+            ->assertJsonPath('base_price', 1500)
+            ->assertJsonPath('sizes', [])
+            ->assertJsonPath('modifiers', [])
+            ->assertJsonPath('modifier_groups', []);
+
+        $this->getJson("/api/establishments/{$arena->id}/foodcourt/products/{$hotDog->id}")
+            ->assertOk()
+            ->assertJsonPath('name', 'Хот-дог')
+            ->assertJsonPath('selection_mode', 'quantity')
+            ->assertJsonPath('base_price', 1500);
+    }
+
     public function test_inactive_ice_arena_menu_returns_404(): void
     {
         $city = City::factory()->create();
@@ -180,9 +223,16 @@ class CoffeeMenuTest extends TestCase
     private function seedCoffeeMenu(EstablishmentType $type = EstablishmentType::Coffee): array
     {
         $city = City::factory()->create();
+        $brand = Brand::factory()->create([
+            'city_id' => $city->id,
+            'type' => $type,
+            'name' => $type === EstablishmentType::Coffee ? 'Кофейня «Москва»' : 'Ледовая арена Haragun',
+        ]);
+
         $establishment = Establishment::factory()->create([
             'city_id' => $city->id,
-            'name' => 'Кофейня «Москва»',
+            'brand_id' => $brand->id,
+            'name' => $brand->name,
             'address' => 'ул. Сейфуллина 154',
             'type' => $type,
         ]);
@@ -209,8 +259,10 @@ class CoffeeMenuTest extends TestCase
             'sort_order' => 3,
         ]);
 
+        $owner = ['brand_id' => $brand->id, 'establishment_id' => null];
+
         $latte = Product::factory()->create([
-            'establishment_id' => $establishment->id,
+            ...$owner,
             'menu_category_id' => $coffee->id,
             'kind' => ProductKind::Food,
             'name' => 'Латте',
@@ -225,7 +277,7 @@ class CoffeeMenuTest extends TestCase
         ]);
 
         Product::factory()->create([
-            'establishment_id' => $establishment->id,
+            ...$owner,
             'menu_category_id' => $coffee->id,
             'kind' => ProductKind::Food,
             'name' => 'Капучино',
@@ -236,7 +288,7 @@ class CoffeeMenuTest extends TestCase
         ]);
 
         Product::factory()->create([
-            'establishment_id' => $establishment->id,
+            ...$owner,
             'menu_category_id' => $tea->id,
             'kind' => ProductKind::Food,
             'name' => 'Чай зелёный',
@@ -273,17 +325,36 @@ class CoffeeMenuTest extends TestCase
             'sort_order' => 3,
         ]);
 
+        $toppings = ModifierCategory::factory()->create([
+            'name' => 'Топпинги',
+            'slug' => 'toppings',
+            'sort_order' => 1,
+        ]);
+        $milk = ModifierCategory::factory()->create([
+            'name' => 'Молоко',
+            'slug' => 'milk',
+            'sort_order' => 2,
+        ]);
+        $syrups = ModifierCategory::factory()->create([
+            'name' => 'Сиропы',
+            'slug' => 'syrups',
+            'sort_order' => 3,
+        ]);
+
         $caramel = Modifier::factory()->create([
+            'modifier_category_id' => $toppings->id,
             'name' => 'Карамель',
             'price' => 1250,
             'sort_order' => 1,
         ]);
         $oatMilk = Modifier::factory()->create([
+            'modifier_category_id' => $milk->id,
             'name' => 'Овсяное',
             'price' => 350,
             'sort_order' => 2,
         ]);
         $vanilla = Modifier::factory()->create([
+            'modifier_category_id' => $syrups->id,
             'name' => 'Ваниль',
             'price' => 250,
             'sort_order' => 3,

@@ -32,12 +32,12 @@ class OrderFeedbackTable
                     }),
                 TextColumn::make('likes')
                     ->label('Плюсы')
-                    ->formatStateUsing(fn (?array $state): string => self::formatTags($state))
+                    ->formatStateUsing(fn (mixed $state): string => self::formatTags($state))
                     ->wrap()
                     ->toggleable(),
                 TextColumn::make('dislikes')
                     ->label('Минусы')
-                    ->formatStateUsing(fn (?array $state): string => self::formatTags($state))
+                    ->formatStateUsing(fn (mixed $state): string => self::formatTags($state))
                     ->wrap()
                     ->toggleable(),
                 TextColumn::make('comment')
@@ -67,15 +67,18 @@ class OrderFeedbackTable
     }
 
     /**
-     * @param  list<string>|null  $state
+     * Filament may pass the full array or each tag string when listing array state.
      */
-    private static function formatTags(?array $state): string
+    private static function formatTags(mixed $state): string
     {
-        if ($state === null || $state === []) {
+        if ($state === null || $state === [] || $state === '') {
             return '—';
         }
 
-        return collect($state)
+        $tags = is_array($state) ? $state : [$state];
+
+        return collect($tags)
+            ->filter(fn (mixed $value): bool => is_string($value) && $value !== '')
             ->map(fn (string $value): string => FeedbackTag::tryFrom($value)?->label() ?? $value)
             ->implode(', ');
     }

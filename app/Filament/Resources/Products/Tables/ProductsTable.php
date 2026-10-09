@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\Products\Tables;
 
-use App\Filament\Support\VenueSection;
 use App\Models\Product;
 use App\Support\Money;
 use Filament\Actions\BulkActionGroup;
@@ -20,7 +19,7 @@ class ProductsTable
     public static function configure(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn ($query) => $query->with('establishment'))
+            ->modifyQueryUsing(fn ($query) => $query->with(['establishment', 'brand']))
             ->defaultSort('sort_order')
             ->columns([
                 ImageColumn::make('image_url')
@@ -33,9 +32,29 @@ class ProductsTable
                     ->searchable()
                     ->sortable()
                     ->weight('bold'),
+                TextColumn::make('brand.name')
+                    ->label('Бренд')
+                    ->placeholder('—')
+                    ->sortable()
+                    ->toggleable(),
                 TextColumn::make('establishment.name')
                     ->label('Точка')
-                    ->searchable()
+                    ->description(fn (Product $record): ?string => $record->establishment?->address)
+                    ->placeholder('Все точки бренда')
+                    ->searchable(query: function ($query, string $search): void {
+                        $query->where(function ($inner) use ($search): void {
+                            $inner->whereHas(
+                                'establishment',
+                                fn ($establishmentQuery) => $establishmentQuery
+                                    ->where('name', 'like', "%{$search}%")
+                                    ->orWhere('address', 'like', "%{$search}%"),
+                            )->orWhereHas(
+                                'brand',
+                                fn ($brandQuery) => $brandQuery->where('name', 'like', "%{$search}%"),
+                            );
+                        });
+                    })
+                    ->wrap()
                     ->toggleable(),
                 TextColumn::make('menuCategory.name')
                     ->label('Категория')
@@ -45,14 +64,6 @@ class ProductsTable
                     ->label('Цена')
                     ->formatStateUsing(fn (int $state): string => Money::format($state))
                     ->sortable(),
-                IconColumn::make('is_popular')
-                    ->label('Популярн.')
-                    ->boolean()
-                    ->visible(fn (): bool => VenueSection::isCafeContext()),
-                IconColumn::make('is_featured')
-                    ->label('Баннер')
-                    ->boolean()
-                    ->visible(fn (): bool => VenueSection::isCafeContext()),
                 IconColumn::make('is_active')
                     ->label('Активен')
                     ->boolean(),
@@ -62,12 +73,6 @@ class ProductsTable
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                TernaryFilter::make('is_popular')
-                    ->label('Популярные')
-                    ->visible(fn (): bool => VenueSection::isCafeContext()),
-                TernaryFilter::make('is_featured')
-                    ->label('В баннере')
-                    ->visible(fn (): bool => VenueSection::isCafeContext()),
                 TernaryFilter::make('is_active')->label('Активные'),
             ])
             ->recordActions([

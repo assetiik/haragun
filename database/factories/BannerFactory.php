@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\BannerPlacement;
 use App\Models\Banner;
 use App\Models\City;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -18,8 +19,10 @@ class BannerFactory extends Factory
     {
         return [
             'city_id' => City::factory(),
+            'placement' => BannerPlacement::Hero,
             'title' => fake()->sentence(3),
             'subtitle' => fake()->sentence(4),
+            'button_label' => 'Узнать больше →',
             'background_color' => '#6B4EFF',
             'image_url' => null,
             'is_active' => true,

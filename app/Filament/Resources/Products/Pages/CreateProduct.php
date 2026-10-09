@@ -30,6 +30,10 @@ class CreateProduct extends CreateRecord
             $data['food_section'] = null;
             $data = $this->fillPriceFromSizes($data);
 
+            if (in_array($this->venueTab ?? VenueSection::fromRequest(), [VenueSection::Cafes, VenueSection::HaragunCafe], true)) {
+                $data['establishment_id'] = null;
+            }
+
             return $data;
         }
 

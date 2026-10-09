@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Enums\EstablishmentType;
+use App\Models\Concerns\HasI18n;
+use App\Support\StoredUrl;
 use Carbon\CarbonInterface;
 use Database\Factories\EstablishmentFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -11,6 +13,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 
@@ -31,14 +34,27 @@ use Illuminate\Support\Carbon;
     'ice_temperature',
     'ice_note',
     'header_color',
+    'image_url',
+    'images',
     'booking_days_ahead',
     'is_active',
     'sort_order',
+    'i18n',
 ])]
 class Establishment extends Model
 {
     /** @use HasFactory<EstablishmentFactory> */
     use HasFactory;
+
+    use HasI18n;
+
+    /**
+     * @return list<string>
+     */
+    protected function translatableAttributes(): array
+    {
+        return ['name', 'address'];
+    }
 
     /**
      * @return array<string, string>
@@ -54,8 +70,10 @@ class Establishment extends Model
             'slot_interval_minutes' => 'integer',
             'ice_temperature' => 'integer',
             'booking_days_ahead' => 'integer',
+            'images' => 'array',
             'is_active' => 'boolean',
             'sort_order' => 'integer',
+            'i18n' => 'array',
         ];
     }
 
@@ -67,6 +85,37 @@ class Establishment extends Model
     public function brand(): BelongsTo
     {
         return $this->belongsTo(Brand::class);
+    }
+
+    public function publicImageUrl(): ?string
+    {
+        return StoredUrl::public($this->image_url);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function publicImages(): array
+    {
+        return collect($this->images ?? [])
+            ->map(fn (mixed $path): ?string => StoredUrl::public(is_string($path) ? $path : null))
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Cover first, then gallery (no duplicates).
+     *
+     * @return list<string>
+     */
+    public function carouselImages(): array
+    {
+        return collect([$this->publicImageUrl(), ...$this->publicImages()])
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
     }
 
     public function menuCategories(): HasMany
@@ -82,6 +131,24 @@ class Establishment extends Model
     public function unavailableSlots(): HasMany
     {
         return $this->hasMany(EstablishmentUnavailableSlot::class);
+    }
+
+    public function favoritedBy(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'favorites')->withTimestamps();
+    }
+
+    public function isFavoritedBy(?User $user): bool
+    {
+        if ($user === null) {
+            return false;
+        }
+
+        if ($this->relationLoaded('favoritedBy')) {
+            return $this->favoritedBy->contains(fn (User $favoritedBy): bool => $favoritedBy->id === $user->id);
+        }
+
+        return $this->favoritedBy()->whereKey($user->id)->exists();
     }
 
     #[Scope]

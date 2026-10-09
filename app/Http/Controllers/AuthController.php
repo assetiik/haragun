@@ -5,12 +5,14 @@ namespace App\Http\Controllers;
 use App\Http\Requests\SendCodeRequest;
 use App\Http\Requests\VerifyCodeRequest;
 use App\Http\Resources\UserResource;
+use App\Models\OtpCode;
 use App\Models\User;
 use App\Services\OtpService;
 use Dedoc\Scramble\Attributes\Endpoint;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 #[Group('Auth', weight: 1)]
 class AuthController extends Controller
@@ -24,7 +26,7 @@ class AuthController extends Controller
         $plainCode = $this->otp->send($phone);
 
         $payload = [
-            'message' => 'Код отправлен',
+            'sent' => true,
         ];
 
         if (! app()->isProduction()) {
@@ -69,8 +71,20 @@ class AuthController extends Controller
     {
         $request->user()->currentAccessToken()->delete();
 
-        return response()->json([
-            'message' => 'Вы вышли из аккаунта',
-        ]);
+        return response()->json(null, 204);
+    }
+
+    #[Endpoint(title: 'Удалить аккаунт', description: 'Удаляет текущего пользователя, его токены, корзины и заказы.')]
+    public function destroy(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        DB::transaction(function () use ($user): void {
+            $user->tokens()->delete();
+            OtpCode::query()->where('phone', $user->phone)->delete();
+            $user->delete();
+        });
+
+        return response()->json(null, 204);
     }
 }

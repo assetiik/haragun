@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Order;
 use App\Models\OtpCode;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -20,8 +21,8 @@ class AuthApiTest extends TestCase
 
         $response
             ->assertOk()
-            ->assertJsonPath('message', 'Код отправлен')
-            ->assertJsonStructure(['message', 'debug_code']);
+            ->assertJsonPath('sent', true)
+            ->assertJsonPath('debug_code', '1234');
 
         $this->assertDatabaseHas('otp_codes', [
             'phone' => '77784046889',
@@ -48,13 +49,9 @@ class AuthApiTest extends TestCase
             'phone' => '77784046889',
         ]);
 
-        $code = OtpCode::query()->latest()->firstOrFail();
-        $plainCode = '1234';
-        $code->update(['code' => Hash::make($plainCode)]);
-
         $response = $this->postJson('/api/auth/verify-code', [
             'phone' => '77784046889',
-            'code' => $plainCode,
+            'code' => '1234',
         ]);
 
         $response
@@ -62,7 +59,7 @@ class AuthApiTest extends TestCase
             ->assertJsonStructure([
                 'token',
                 'token_type',
-                'user' => ['id', 'name', 'phone', 'phone_formatted', 'initials', 'needs_name'],
+                'user' => ['id', 'name', 'phone', 'needs_name'],
                 'needs_name',
             ])
             ->assertJsonPath('user.phone', '77784046889')
@@ -94,19 +91,15 @@ class AuthApiTest extends TestCase
             'phone' => '77071234567',
         ]);
 
-        $otp = OtpCode::query()->latest()->firstOrFail();
-        $plainCode = '4321';
-        $otp->update(['code' => Hash::make($plainCode)]);
-
         $this->postJson('/api/auth/verify-code', [
             'phone' => '77071234567',
-            'code' => $plainCode,
+            'code' => '1234',
         ])
             ->assertOk()
             ->assertJsonStructure([
-                'user' => ['id', 'name', 'phone', 'phone_formatted', 'initials', 'needs_name'],
+                'user' => ['id', 'name', 'phone', 'needs_name'],
             ])
-            ->assertJsonPath('user.phone_formatted', '+7 707 123 45 67')
+            ->assertJsonPath('user.phone', '77071234567')
             ->assertJsonPath('user.needs_name', true);
     }
 
@@ -117,10 +110,80 @@ class AuthApiTest extends TestCase
 
         $this->withToken($token)
             ->postJson('/api/auth/logout')
-            ->assertOk()
-            ->assertJsonPath('message', 'Вы вышли из аккаунта');
+            ->assertNoContent();
 
         $this->assertDatabaseCount('personal_access_tokens', 0);
+    }
+
+    public function test_guest_cannot_delete_account(): void
+    {
+        $this->deleteJson('/api/auth/account')->assertUnauthorized();
+    }
+
+    public function test_authenticated_user_can_delete_own_account(): void
+    {
+        $user = User::factory()->create([
+            'phone' => '77071234567',
+        ]);
+        $other = User::factory()->create();
+        $token = $user->createToken('flutter')->plainTextToken;
+        $order = Order::factory()->create([
+            'user_id' => $user->id,
+        ]);
+        Order::factory()->create([
+            'user_id' => $other->id,
+        ]);
+        OtpCode::query()->create([
+            'phone' => $user->phone,
+            'code' => Hash::make('1234'),
+            'expires_at' => now()->addMinutes(5),
+        ]);
+
+        $this->withToken($token)
+            ->deleteJson('/api/auth/account')
+            ->assertNoContent();
+
+        $this->assertDatabaseMissing('users', ['id' => $user->id]);
+        $this->assertDatabaseMissing('orders', ['id' => $order->id]);
+        $this->assertDatabaseMissing('otp_codes', ['phone' => '77071234567']);
+        $this->assertDatabaseHas('users', ['id' => $other->id]);
+        $this->assertDatabaseCount('personal_access_tokens', 0);
+
+        $this->app['auth']->forgetGuards();
+
+        $this->withToken($token)
+            ->getJson('/api/me')
+            ->assertUnauthorized();
+    }
+
+    public function test_deleted_phone_can_register_again(): void
+    {
+        $user = User::factory()->create([
+            'phone' => '77071234567',
+            'name' => 'Аружан',
+        ]);
+        $token = $user->createToken('flutter')->plainTextToken;
+
+        $this->withToken($token)
+            ->deleteJson('/api/auth/account')
+            ->assertNoContent();
+
+        $this->postJson('/api/auth/send-code', [
+            'phone' => '77071234567',
+        ])->assertOk();
+
+        $this->postJson('/api/auth/verify-code', [
+            'phone' => '77071234567',
+            'code' => '1234',
+        ])
+            ->assertOk()
+            ->assertJsonPath('needs_name', true)
+            ->assertJsonPath('user.phone', '77071234567');
+
+        $this->assertDatabaseHas('users', [
+            'phone' => '77071234567',
+            'name' => null,
+        ]);
     }
 
     public function test_me_requires_authentication(): void

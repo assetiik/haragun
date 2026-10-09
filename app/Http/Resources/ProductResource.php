@@ -21,12 +21,8 @@ class ProductResource extends JsonResource
             'kind' => $this->kind->value,
             'name' => $this->name,
             'price' => $this->price,
-            'price_label' => $this->priceLabel(),
             'meta' => $this->meta,
             'age_from' => $this->age_from,
-            'subtitle' => collect([$this->priceLabel(), $this->meta])
-                ->filter()
-                ->implode(' · '),
         ];
     }
 }

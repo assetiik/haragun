@@ -11,6 +11,8 @@ use Filament\Actions\EditAction;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Grouping\Group;
 use Filament\Tables\Table;
 
 class ModifiersTable
@@ -18,7 +20,14 @@ class ModifiersTable
     public static function configure(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(fn ($query) => $query->with('category'))
             ->defaultSort('sort_order')
+            ->defaultGroup('category.name')
+            ->groups([
+                Group::make('category.name')
+                    ->label('Категория')
+                    ->collapsible(),
+            ])
             ->columns([
                 ImageColumn::make('image_url')
                     ->label('')
@@ -29,6 +38,11 @@ class ModifiersTable
                     ->searchable()
                     ->sortable()
                     ->weight('bold'),
+                TextColumn::make('category.name')
+                    ->label('Категория')
+                    ->badge()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('price')
                     ->label('Цена')
                     ->formatStateUsing(fn (int $state): string => Money::format($state))
@@ -40,6 +54,11 @@ class ModifiersTable
                     ->label('Порядок')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
+            ])
+            ->filters([
+                SelectFilter::make('modifier_category_id')
+                    ->label('Категория')
+                    ->relationship('category', 'name'),
             ])
             ->recordActions([
                 EditAction::make()->label('Изменить'),

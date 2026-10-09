@@ -61,17 +61,19 @@ class OrderService
             ]);
 
             foreach (array_values($quote['lines']) as $index => $line) {
+                $name = $line['name'] ?? $line['code'] ?? '';
+
                 OrderItem::query()->create([
                     'order_id' => $order->id,
                     'product_id' => $line['product_id'],
                     'kind' => $line['kind'],
-                    'name' => $line['name'],
+                    'name' => $name,
                     'subtitle' => $this->itemSubtitle($line),
                     'quantity' => $line['quantity'],
                     'unit_price' => $line['unit_price'],
                     'amount' => $line['amount'],
                     'sizes' => $line['sizes'] ?: null,
-                    'icon_key' => $this->iconKey($line['kind'], $line['name']),
+                    'icon_key' => $this->iconKey($line['kind'], $name),
                     'is_discount' => (bool) $line['is_discount'],
                     'sort_order' => $index + 1,
                 ]);
@@ -123,7 +125,7 @@ class OrderService
     {
         $names = collect($lines)
             ->reject(fn (array $line) => $line['is_discount'])
-            ->pluck('name')
+            ->map(fn (array $line) => $line['name'] ?? $line['code'] ?? null)
             ->unique()
             ->values();
 

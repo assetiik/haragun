@@ -47,7 +47,9 @@ class OrderApiTest extends TestCase
             ->assertJsonPath('order.type', 'tickets')
             ->assertJsonPath('order.status', 'confirmed')
             ->assertJsonPath('order.total', 10000)
-            ->assertJsonPath('order.pickup.label', 'Код брони');
+            ->assertJsonPath('order.session.date', '2026-02-13')
+            ->assertJsonPath('order.session.time', '16:00')
+            ->assertJsonPath('order.actions.1', 'rebook');
 
         $this->assertDatabaseHas('orders', [
             'user_id' => $user->id,
@@ -84,6 +86,7 @@ class OrderApiTest extends TestCase
             'name' => 'Капучино',
             'quantity' => 2,
             'amount' => 2400,
+            'image_url' => 'https://example.com/cappuccino.jpg',
         ]);
 
         Order::factory()->create([
@@ -103,16 +106,23 @@ class OrderApiTest extends TestCase
         $this->getJson('/api/orders?type=venue')
             ->assertOk()
             ->assertJsonPath('selected_tab', 'venue')
-            ->assertJsonPath('tabs.0.badge', 1)
+            ->assertJsonPath('tabs.0.key', 'venue')
+            ->assertJsonPath('tabs.1.key', 'tickets')
+            ->assertJsonPath('tabs.0.count', 1)
             ->assertJsonPath('sections.0.key', 'active')
             ->assertJsonPath('sections.0.orders.0.number', 4821)
-            ->assertJsonPath('sections.0.orders.0.primary_action.code', 'HRG-4821')
+            ->assertJsonPath('sections.0.orders.0.primary_action', 'pickup_code')
+            ->assertJsonPath('sections.0.orders.0.code', 'HRG-4821')
+            ->assertJsonPath('sections.0.orders.0.total', 17550)
+            ->assertJsonPath('sections.0.orders.0.thumbnails.0', 'https://example.com/cappuccino.jpg')
             ->assertJsonPath('sections.1.key', 'history')
             ->assertJsonPath('sections.1.orders.0.number', 3902);
     }
 
     public function test_user_can_view_own_order_details(): void
     {
+        Carbon::setTestNow(Carbon::parse('2026-09-23 12:08:00'));
+
         $user = User::factory()->create();
         $coffee = Establishment::factory()->create([
             'name' => 'Кофейня Haragun',
@@ -129,7 +139,8 @@ class OrderApiTest extends TestCase
             'total' => 8100,
             'summary_title' => 'Капучино, чизкейк и сэндвич',
             'points_to_earn' => 405,
-            'preparing_at' => now()->subMinute(),
+            'paid_at' => now()->subDay(),
+            'preparing_at' => now()->subDay()->addMinute(),
             'prep_minutes' => 5,
         ]);
 
@@ -145,12 +156,13 @@ class OrderApiTest extends TestCase
 
         $this->getJson("/api/orders/{$order->id}")
             ->assertOk()
-            ->assertJsonPath('title', 'Заказ №4821')
+            ->assertJsonPath('number', 4821)
             ->assertJsonPath('code', 'HRG-4821')
             ->assertJsonPath('summary_title', 'Капучино, чизкейк и сэндвич')
             ->assertJsonPath('items.0.name', 'Капучино')
-            ->assertJsonPath('pickup.code', 'HRG-4821')
-            ->assertJsonPath('points_note', 'Начислим 405 баллов после выдачи');
+            ->assertJsonPath('items.0.subtitle', '250 мл · без сахара')
+            ->assertJsonPath('points_to_earn', 405)
+            ->assertJsonPath('placed_at', '2026-09-22T12:08:00+00:00');
     }
 
     public function test_user_cannot_view_another_users_order(): void

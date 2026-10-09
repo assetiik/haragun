@@ -27,7 +27,7 @@ class OrderController extends Controller
         $userId = $request->user()->id;
 
         $orders = Order::query()
-            ->with(['establishment', 'items'])
+            ->with(['establishment', 'items.product'])
             ->forUser($userId)
             ->ofType($type)
             ->latest('id')
@@ -47,25 +47,21 @@ class OrderController extends Controller
             'tabs' => [
                 [
                     'key' => OrderType::Venue->value,
-                    'title' => OrderType::Venue->tabTitle(),
-                    'badge' => $counts[OrderType::Venue->value],
+                    'count' => $counts[OrderType::Venue->value],
                 ],
                 [
                     'key' => OrderType::Tickets->value,
-                    'title' => OrderType::Tickets->tabTitle(),
-                    'badge' => $counts[OrderType::Tickets->value],
+                    'count' => $counts[OrderType::Tickets->value],
                 ],
             ],
             'selected_tab' => $type->value,
             'sections' => [
                 [
                     'key' => 'active',
-                    'title' => $type === OrderType::Tickets ? 'Ближайший сеанс' : 'Активный',
                     'orders' => OrderListResource::collection($active),
                 ],
                 [
                     'key' => 'history',
-                    'title' => 'История',
                     'orders' => OrderListResource::collection($history),
                 ],
             ],
@@ -77,7 +73,6 @@ class OrderController extends Controller
         $order = $this->orders->create($request->user(), $request->validated());
 
         return response()->json([
-            'message' => 'Заказ оформлен',
             'order' => new OrderDetailResource($order),
         ], 201);
     }

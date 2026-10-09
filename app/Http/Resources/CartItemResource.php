@@ -23,13 +23,10 @@ class CartItemResource extends JsonResource
             'id' => $this->id,
             'product_id' => $this->product_id,
             'name' => $this->product->name,
-            'subtitle' => $this->subtitle(),
             'image_url' => $this->product->publicImageUrl(),
             'quantity' => $this->quantity,
             'unit_price' => $this->unit_price,
-            'unit_price_label' => $this->unitPriceLabel(),
             'amount' => $this->amount(),
-            'amount_label' => $this->amountLabel(),
             'size' => $this->size ? [
                 'id' => $this->size->id,
                 'code' => $this->size->code,
@@ -40,7 +37,6 @@ class CartItemResource extends JsonResource
                 'id' => $modifier->id,
                 'name' => $modifier->name,
                 'price' => $modifier->price,
-                'price_label' => $modifier->priceLabel(),
             ])->values(),
         ];
     }

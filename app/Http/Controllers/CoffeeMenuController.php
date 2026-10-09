@@ -12,7 +12,6 @@ use App\Models\MenuCategory;
 use App\Models\Modifier;
 use App\Models\Product;
 use App\Services\CartService;
-use App\Support\Money;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -40,7 +39,6 @@ class CoffeeMenuController extends Controller
         $chips = collect([
             [
                 'slug' => 'popular',
-                'name' => 'Популярные',
             ],
         ])->concat($categories->map(fn (MenuCategory $category) => [
             'slug' => $category->slug,
@@ -54,7 +52,7 @@ class CoffeeMenuController extends Controller
 
         $productsQuery = Product::query()
             ->with('menuCategory')
-            ->where('establishment_id', $establishment->id)
+            ->availableAt($establishment)
             ->coffeeMenu()
             ->active()
             ->ordered();
@@ -69,7 +67,7 @@ class CoffeeMenuController extends Controller
         $products = $productsQuery->get();
 
         $featured = Product::query()
-            ->where('establishment_id', $establishment->id)
+            ->availableAt($establishment)
             ->coffeeMenu()
             ->active()
             ->featured()
@@ -80,8 +78,6 @@ class CoffeeMenuController extends Controller
         $cartSummary = [
             'items_count' => 0,
             'total' => 0,
-            'total_label' => Money::format(0),
-            'label' => 'Корзина · 0 шт',
         ];
         $activeOrder = null;
 
@@ -119,16 +115,22 @@ class CoffeeMenuController extends Controller
     public function show(Establishment $establishment, Product $product): CoffeeProductDetailResource
     {
         $this->ensureCoffee($establishment);
+
+        $product->loadMissing('menuCategory');
+
         abort_unless(
-            $product->establishment_id === $establishment->id
+            $product->belongsToVenue($establishment)
                 && $product->is_active
-                && $product->menuCategory?->type === EstablishmentType::Coffee,
+                && (
+                    $product->menuCategory?->type === EstablishmentType::Coffee
+                    || $product->menuCategory?->isFoodCourt()
+                ),
             404
         );
 
         $product->load([
             'sizes' => fn ($query) => $query->ordered(),
-            'modifiers' => fn ($query) => $query->active(),
+            'modifiers' => fn ($query) => $query->active()->with('category'),
         ]);
 
         return new CoffeeProductDetailResource($product);
@@ -141,47 +143,53 @@ class CoffeeMenuController extends Controller
         $validated = $request->validated();
 
         $product = Product::query()
-            ->with(['sizes', 'modifiers' => fn ($query) => $query->active()])
-            ->where('establishment_id', $establishment->id)
-            ->coffeeMenu()
+            ->with(['sizes', 'modifiers' => fn ($query) => $query->active(), 'menuCategory'])
+            ->availableAt($establishment)
+            ->venueCart()
             ->active()
             ->findOrFail($validated['product_id']);
 
+        $isFoodCourt = $product->menuCategory?->isFoodCourt() ?? false;
+
         $size = null;
-        if (isset($validated['size_id'])) {
-            $size = $product->sizes->firstWhere('id', (int) $validated['size_id']);
-            if ($size === null) {
-                throw ValidationException::withMessages([
-                    'size_id' => ['Выбранный размер недоступен.'],
-                ]);
+        if (! $isFoodCourt) {
+            if (isset($validated['size_id'])) {
+                $size = $product->sizes->firstWhere('id', (int) $validated['size_id']);
+                if ($size === null) {
+                    throw ValidationException::withMessages([
+                        'size_id' => ['Выбранный размер недоступен.'],
+                    ]);
+                }
+            } else {
+                $size = $product->defaultSize();
             }
-        } else {
-            $size = $product->defaultSize();
         }
 
         $unitPrice = $size?->price ?? $product->price;
         $modifiers = collect();
 
-        foreach ($validated['modifier_ids'] ?? [] as $modifierId) {
-            $modifier = Modifier::query()
-                ->whereKey($modifierId)
-                ->active()
-                ->first();
+        if (! $isFoodCourt) {
+            foreach ($validated['modifier_ids'] ?? [] as $modifierId) {
+                $modifier = Modifier::query()
+                    ->whereKey($modifierId)
+                    ->active()
+                    ->first();
 
-            if ($modifier === null) {
-                throw ValidationException::withMessages([
-                    'modifier_ids' => ["Добавка #{$modifierId} недоступна."],
-                ]);
+                if ($modifier === null) {
+                    throw ValidationException::withMessages([
+                        'modifier_ids' => ["Добавка #{$modifierId} недоступна."],
+                    ]);
+                }
+
+                if (! $product->modifiers->contains('id', $modifier->id)) {
+                    throw ValidationException::withMessages([
+                        'modifier_ids' => ["Добавка {$modifier->name} не подходит к этому напитку."],
+                    ]);
+                }
+
+                $modifiers->push($modifier);
+                $unitPrice += $modifier->price;
             }
-
-            if (! $product->modifiers->contains('id', $modifier->id)) {
-                throw ValidationException::withMessages([
-                    'modifier_ids' => ["Добавка {$modifier->name} не подходит к этому напитку."],
-                ]);
-            }
-
-            $modifiers->push($modifier);
-            $unitPrice += $modifier->price;
         }
 
         $quantity = (int) ($validated['quantity'] ?? 1);
@@ -199,14 +207,10 @@ class CoffeeMenuController extends Controller
                 'id' => $modifier->id,
                 'name' => $modifier->name,
                 'price' => $modifier->price,
-                'price_label' => $modifier->priceLabel(),
             ])->values(),
             'quantity' => $quantity,
             'unit_price' => $unitPrice,
-            'unit_price_label' => Money::format($unitPrice),
             'total' => $total,
-            'total_label' => Money::format($total),
-            'add_button_label' => Money::format($total),
         ]);
     }
 

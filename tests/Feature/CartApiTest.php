@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\EstablishmentType;
 use App\Enums\OrderStatus;
 use App\Enums\ProductKind;
+use App\Models\Brand;
 use App\Models\City;
 use App\Models\Establishment;
 use App\Models\MenuCategory;
@@ -45,17 +46,15 @@ class CartApiTest extends TestCase
 
         $add
             ->assertOk()
-            ->assertJsonPath('title', 'Оформить заказ')
-            ->assertJsonPath('header.address', 'ул. Сейфуллина 154')
-            ->assertJsonPath('header.pickup_label', 'Забрать на стойке · 10–15 мин')
+            ->assertJsonPath('establishment.address', 'ул. Сейфуллина 154')
             ->assertJsonPath('items.0.name', 'Латте')
-            ->assertJsonPath('items.0.subtitle', '400 мл, Карамель')
+            ->assertJsonPath('items.0.size.label', '400 мл')
+            ->assertJsonPath('items.0.modifiers.0.name', 'Карамель')
             ->assertJsonPath('items.0.unit_price', 2940)
             ->assertJsonPath('payment.selected_id', 'kaspi')
-            ->assertJsonPath('payment.methods.0.name', 'Kaspi')
+            ->assertJsonPath('payment.methods.0.id', 'kaspi')
             ->assertJsonPath('totals.total', 2940)
-            ->assertJsonPath('totals.pay_button_label', 'Оплатить 2 940 ₸')
-            ->assertJsonPath('clear_confirm.title', 'Очистить корзину?');
+            ->assertJsonPath('totals.items_count', 1);
 
         $itemId = $add->json('items.0.id');
 
@@ -65,12 +64,12 @@ class CartApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('items.0.quantity', 2)
             ->assertJsonPath('totals.total', 5880)
-            ->assertJsonPath('summary.label', 'Корзина · 2 шт');
+            ->assertJsonPath('totals.items_count', 2);
 
         $this->getJson("/api/establishments/{$establishment->id}/menu")
             ->assertOk()
             ->assertJsonPath('cart.items_count', 2)
-            ->assertJsonPath('cart.label', 'Корзина · 2 шт')
+            ->assertJsonPath('cart.total', 5880)
             ->assertJsonPath('active_order', null);
     }
 
@@ -109,11 +108,9 @@ class CartApiTest extends TestCase
 
         $response
             ->assertCreated()
-            ->assertJsonPath('message', 'Заказ оформлен')
             ->assertJsonPath('order.status', 'accepted')
             ->assertJsonPath('order.type', 'venue')
             ->assertJsonPath('order.total', 2940)
-            ->assertJsonPath('order.status_banner.title', 'Заказ принят')
             ->assertJsonPath('cart.is_empty', true);
 
         $this->assertDatabaseHas('orders', [
@@ -130,8 +127,8 @@ class CartApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('cart.items_count', 0)
             ->assertJsonPath('active_order.number', $orderNumber)
-            ->assertJsonPath('active_order.status_label', 'Принят')
-            ->assertJsonPath('active_order.title', 'Заказ принят');
+            ->assertJsonPath('active_order.status', 'accepted')
+            ->assertJsonPath('active_order.code', $response->json('order.code'));
     }
 
     public function test_identical_items_merge_quantity(): void
@@ -157,6 +154,55 @@ class CartApiTest extends TestCase
         $this->assertCount(1, $this->getJson("/api/establishments/{$establishment->id}/cart")->json('items'));
     }
 
+    public function test_user_can_quote_and_add_foodcourt_snack_without_size(): void
+    {
+        $city = City::factory()->create();
+        $user = User::factory()->create();
+        $arena = Establishment::factory()->create([
+            'city_id' => $city->id,
+            'type' => EstablishmentType::IceArena,
+            'name' => 'Ледовая арена Haragun',
+            'address' => 'пр. Достык, 240',
+        ]);
+        $foodcourt = MenuCategory::factory()->create([
+            'establishment_id' => $arena->id,
+            'type' => EstablishmentType::IceArena,
+            'slug' => 'foodcourt',
+            'name' => 'Фудкорт',
+        ]);
+        $donut = Product::factory()->create([
+            'establishment_id' => $arena->id,
+            'menu_category_id' => $foodcourt->id,
+            'kind' => ProductKind::Food,
+            'name' => 'Пончик',
+            'price' => 800,
+            'food_section' => 'Перекус',
+        ]);
+
+        Sanctum::actingAs($user);
+
+        $this->postJson("/api/establishments/{$arena->id}/menu/quote", [
+            'product_id' => $donut->id,
+            'quantity' => 2,
+        ])
+            ->assertOk()
+            ->assertJsonPath('product_id', $donut->id)
+            ->assertJsonPath('size', null)
+            ->assertJsonPath('modifiers', [])
+            ->assertJsonPath('quantity', 2)
+            ->assertJsonPath('unit_price', 800)
+            ->assertJsonPath('total', 1600);
+
+        $this->postJson("/api/establishments/{$arena->id}/cart/items", [
+            'product_id' => $donut->id,
+            'quantity' => 2,
+        ])
+            ->assertOk()
+            ->assertJsonPath('items.0.name', 'Пончик')
+            ->assertJsonPath('items.0.quantity', 2)
+            ->assertJsonPath('totals.total', 1600);
+    }
+
     /**
      * @return array{0: User, 1: Establishment, 2: Product, 3: ProductSize, 4: Modifier}
      */
@@ -164,21 +210,29 @@ class CartApiTest extends TestCase
     {
         $city = City::factory()->create();
         $user = User::factory()->create();
+        $brand = Brand::factory()->create([
+            'city_id' => $city->id,
+            'type' => EstablishmentType::Coffee,
+            'name' => 'Кофейня «Москва»',
+        ]);
         $establishment = Establishment::factory()->create([
             'city_id' => $city->id,
+            'brand_id' => $brand->id,
             'name' => 'Кофейня «Москва»',
             'address' => 'ул. Сейфуллина 154',
             'type' => EstablishmentType::Coffee,
         ]);
 
         $coffee = MenuCategory::factory()->create([
-            'establishment_id' => $establishment->id,
+            'establishment_id' => null,
+            'type' => EstablishmentType::Coffee,
             'name' => 'Кофе',
             'slug' => 'coffee',
         ]);
 
         $latte = Product::factory()->create([
-            'establishment_id' => $establishment->id,
+            'establishment_id' => null,
+            'brand_id' => $brand->id,
             'menu_category_id' => $coffee->id,
             'kind' => ProductKind::Food,
             'name' => 'Латте',

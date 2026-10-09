@@ -10,7 +10,7 @@ class OtpService
 {
     public function send(string $phone): string
     {
-        $plainCode = (string) random_int(1000, 9999);
+        $plainCode = $this->plainCode();
 
         OtpCode::query()->create([
             'phone' => $phone,
@@ -41,5 +41,16 @@ class OtpService
         ]);
 
         return true;
+    }
+
+    private function plainCode(): string
+    {
+        $staticCode = config('services.otp.static_code');
+
+        if (filled($staticCode)) {
+            return (string) $staticCode;
+        }
+
+        return (string) random_int(1000, 9999);
     }
 }

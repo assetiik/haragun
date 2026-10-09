@@ -86,7 +86,6 @@ class CartController extends Controller
         $result = $this->carts->checkout($cart, $request->validated('payment_label'));
 
         return response()->json([
-            'message' => 'Заказ оформлен',
             'order' => new OrderDetailResource($result['order']),
             'coffee_screen' => new OrderCoffeeScreenResource($result['order']),
             'cart' => new CartResource($result['cart']),

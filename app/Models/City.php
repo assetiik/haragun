@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasI18n;
 use App\Support\Slugger;
 use Database\Factories\CityFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -11,11 +12,21 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['name', 'slug', 'is_active', 'sort_order'])]
+#[Fillable(['name', 'slug', 'is_active', 'sort_order', 'i18n'])]
 class City extends Model
 {
     /** @use HasFactory<CityFactory> */
     use HasFactory;
+
+    use HasI18n;
+
+    /**
+     * @return list<string>
+     */
+    protected function translatableAttributes(): array
+    {
+        return ['name'];
+    }
 
     /**
      * @return array<string, string>
@@ -25,6 +36,7 @@ class City extends Model
         return [
             'is_active' => 'boolean',
             'sort_order' => 'integer',
+            'i18n' => 'array',
         ];
     }
 
@@ -60,7 +72,7 @@ class City extends Model
         static::saving(function (City $city): void {
             if (blank($city->slug) || $city->isDirty('name')) {
                 $city->slug = Slugger::unique(
-                    $city->name,
+                    $city->stored('name'),
                     self::class,
                     ignoreId: $city->id,
                     fallback: 'city',

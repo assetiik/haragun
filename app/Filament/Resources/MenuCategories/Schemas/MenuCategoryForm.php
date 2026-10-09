@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\MenuCategories\Schemas;
 
+use App\Filament\Support\LocalizedFields;
 use App\Filament\Support\VenueSection;
 use App\Models\Establishment;
 use Filament\Forms\Components\Select;
@@ -23,7 +24,7 @@ class MenuCategoryForm
                     ->columnSpanFull()
                     ->schema([
                         TextInput::make('name')
-                            ->label('Название')
+                            ->label('Название · RU')
                             ->required()
                             ->maxLength(120)
                             ->columnSpan([
@@ -44,6 +45,7 @@ class MenuCategoryForm
                             ->columnSpan([
                                 'md' => 2,
                             ]),
+                        ...LocalizedFields::text('name', 'Название', 120),
                         Select::make('establishment_id')
                             ->label('Заведение')
                             ->relationship(
@@ -102,25 +104,29 @@ class MenuCategoryForm
                     ->visible(fn ($livewire): bool => ! self::isCoffeeForm($livewire))
                     ->schema([
                         TextInput::make('section_title')
-                            ->label('Заголовок секции')
+                            ->label('Заголовок секции · RU')
                             ->columnSpan([
                                 'md' => 6,
                             ]),
                         TextInput::make('section_subtitle')
-                            ->label('Подзаголовок секции')
+                            ->label('Подзаголовок секции · RU')
                             ->columnSpan([
                                 'md' => 6,
                             ]),
                         TextInput::make('header_title')
-                            ->label('Заголовок шапки')
+                            ->label('Заголовок шапки · RU')
                             ->columnSpan([
                                 'md' => 6,
                             ]),
                         TextInput::make('header_subtitle')
-                            ->label('Подзаголовок шапки')
+                            ->label('Подзаголовок шапки · RU')
                             ->columnSpan([
                                 'md' => 6,
                             ]),
+                        ...LocalizedFields::text('section_title', 'Заголовок секции'),
+                        ...LocalizedFields::text('section_subtitle', 'Подзаголовок секции'),
+                        ...LocalizedFields::text('header_title', 'Заголовок шапки'),
+                        ...LocalizedFields::text('header_subtitle', 'Подзаголовок шапки'),
                     ])
                     ->columns([
                         'default' => 1,

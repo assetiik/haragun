@@ -4,9 +4,10 @@ namespace Database\Seeders;
 
 use App\Enums\EstablishmentType;
 use App\Enums\ProductKind;
-use App\Models\Establishment;
+use App\Models\Brand;
 use App\Models\MenuCategory;
 use App\Models\Modifier;
+use App\Models\ModifierCategory;
 use App\Models\Product;
 use App\Models\ProductSize;
 use Illuminate\Database\Eloquent\Builder;
@@ -14,21 +15,27 @@ use Illuminate\Database\Seeder;
 
 class CoffeeMenuSeeder extends Seeder
 {
+    /**
+     * Manual demo catalog only. Do not run on production deploys —
+     * it overwrites cafe menus. Use: php artisan db:seed --class=CoffeeMenuSeeder
+     */
     public function run(): void
     {
-        $branches = Establishment::query()
-            ->where('is_active', true)
-            ->whereIn('type', [
-                EstablishmentType::Coffee,
-                EstablishmentType::IceArena,
-            ])
-            ->get();
-
         $categoryModels = $this->sharedCategories();
         $modifierIdsByGroup = $this->seedModifiers();
 
-        foreach ($branches as $branch) {
-            $this->seedBranch($branch, $categoryModels, $modifierIdsByGroup);
+        $brands = Brand::query()
+            ->whereIn('type', [EstablishmentType::Coffee, EstablishmentType::IceArena])
+            ->where('is_active', true)
+            ->orderBy('id')
+            ->get();
+
+        foreach ($brands as $brand) {
+            $this->seedCatalog(
+                owner: ['brand_id' => $brand->id, 'establishment_id' => null],
+                categoryModels: $categoryModels,
+                modifierIdsByGroup: $modifierIdsByGroup,
+            );
         }
     }
 
@@ -74,19 +81,22 @@ class CoffeeMenuSeeder extends Seeder
     }
 
     /**
+     * @param  array{brand_id: ?int, establishment_id: ?int}  $owner
      * @param  array<string, MenuCategory>  $categoryModels
      * @param  array<string, list<int>>  $modifierIdsByGroup
      */
-    private function seedBranch(Establishment $branch, array $categoryModels, array $modifierIdsByGroup): void
+    private function seedCatalog(array $owner, array $categoryModels, array $modifierIdsByGroup): void
     {
-        MenuCategory::query()
-            ->where('establishment_id', $branch->id)
-            ->where('slug', 'menu')
-            ->get()
-            ->each(function (MenuCategory $category): void {
-                Product::query()->where('menu_category_id', $category->id)->delete();
-                $category->delete();
-            });
+        if ($owner['establishment_id'] !== null) {
+            MenuCategory::query()
+                ->where('establishment_id', $owner['establishment_id'])
+                ->where('slug', 'menu')
+                ->get()
+                ->each(function (MenuCategory $category): void {
+                    Product::query()->where('menu_category_id', $category->id)->delete();
+                    $category->delete();
+                });
+        }
 
         $categories = $this->categoryDefinitions();
 
@@ -293,7 +303,11 @@ class CoffeeMenuSeeder extends Seeder
         $keepNames = collect($products)->pluck('name');
 
         Product::query()
-            ->where('establishment_id', $branch->id)
+            ->when(
+                $owner['brand_id'] !== null,
+                fn (Builder $query): Builder => $query->where('brand_id', $owner['brand_id']),
+                fn (Builder $query): Builder => $query->where('establishment_id', $owner['establishment_id']),
+            )
             ->where('kind', ProductKind::Food)
             ->whereNotIn('name', $keepNames)
             ->whereHas(
@@ -305,10 +319,13 @@ class CoffeeMenuSeeder extends Seeder
         foreach ($products as $item) {
             $product = Product::query()->updateOrCreate(
                 [
-                    'establishment_id' => $branch->id,
-                    'name' => $item['name'],
+                    ...($owner['brand_id'] !== null
+                        ? ['brand_id' => $owner['brand_id'], 'name' => $item['name']]
+                        : ['establishment_id' => $owner['establishment_id'], 'name' => $item['name']]),
                 ],
                 [
+                    'brand_id' => $owner['brand_id'],
+                    'establishment_id' => $owner['establishment_id'],
                     'menu_category_id' => $categoryModels[$item['category']]->id,
                     'kind' => ProductKind::Food,
                     'price' => $item['price'],
@@ -363,6 +380,26 @@ class CoffeeMenuSeeder extends Seeder
      */
     private function seedModifiers(): array
     {
+        $categories = [
+            'toppings' => ['name' => 'Топпинги', 'sort_order' => 1],
+            'milk' => ['name' => 'Молоко', 'sort_order' => 2],
+            'syrups' => ['name' => 'Сиропы', 'sort_order' => 3],
+        ];
+
+        $categoryIds = [];
+
+        foreach ($categories as $slug => $data) {
+            $category = ModifierCategory::query()->updateOrCreate(
+                ['slug' => $slug],
+                [
+                    'name' => $data['name'],
+                    'is_active' => true,
+                    'sort_order' => $data['sort_order'],
+                ],
+            );
+            $categoryIds[$slug] = $category->id;
+        }
+
         $definitions = [
             'toppings' => [
                 ['name' => 'Карамель', 'price' => 1250, 'image_url' => 'https://images.unsplash.com/photo-1587017539504-67cfbddac569?w=400'],
@@ -394,6 +431,7 @@ class CoffeeMenuSeeder extends Seeder
                         'price' => $item['price'],
                     ],
                     [
+                        'modifier_category_id' => $categoryIds[$slug],
                         'image_url' => $item['image_url'],
                         'is_active' => true,
                         'sort_order' => $sortOrder,

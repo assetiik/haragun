@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\EstablishmentType;
 use App\Enums\ProductKind;
+use App\Models\Concerns\HasI18n;
 use App\Support\Money;
 use App\Support\StoredUrl;
 use Database\Factories\ProductFactory;
@@ -18,6 +19,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'establishment_id',
+    'brand_id',
     'menu_category_id',
     'kind',
     'requires_size',
@@ -36,11 +38,22 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'age_from',
     'is_active',
     'sort_order',
+    'i18n',
 ])]
 class Product extends Model
 {
     /** @use HasFactory<ProductFactory> */
     use HasFactory;
+
+    use HasI18n;
+
+    /**
+     * @return list<string>
+     */
+    protected function translatableAttributes(): array
+    {
+        return ['name', 'description'];
+    }
 
     /**
      * @return array<string, string>
@@ -58,12 +71,18 @@ class Product extends Model
             'is_featured' => 'boolean',
             'is_active' => 'boolean',
             'sort_order' => 'integer',
+            'i18n' => 'array',
         ];
     }
 
     public function establishment(): BelongsTo
     {
         return $this->belongsTo(Establishment::class);
+    }
+
+    public function brand(): BelongsTo
+    {
+        return $this->belongsTo(Brand::class);
     }
 
     public function menuCategory(): BelongsTo
@@ -132,6 +151,17 @@ class Product extends Model
     }
 
     #[Scope]
+    protected function venueCart(Builder $query): void
+    {
+        $query->food()->whereHas(
+            'menuCategory',
+            fn (Builder $categoryQuery): Builder => $categoryQuery
+                ->where('type', EstablishmentType::Coffee)
+                ->orWhereIn('slug', ['foodcourt', 'snack']),
+        );
+    }
+
+    #[Scope]
     protected function popular(Builder $query): void
     {
         $query->where('is_popular', true);
@@ -141,6 +171,30 @@ class Product extends Model
     protected function featured(Builder $query): void
     {
         $query->where('is_featured', true);
+    }
+
+    /**
+     * Brand-owned cafe drinks OR establishment-owned arena/foodcourt items.
+     */
+    #[Scope]
+    protected function availableAt(Builder $query, Establishment $establishment): void
+    {
+        $query->where(function (Builder $inner) use ($establishment): void {
+            $inner->where('establishment_id', $establishment->id);
+
+            if ($establishment->brand_id !== null) {
+                $inner->orWhere('brand_id', $establishment->brand_id);
+            }
+        });
+    }
+
+    public function belongsToVenue(Establishment $establishment): bool
+    {
+        if ($this->brand_id !== null) {
+            return $establishment->brand_id === $this->brand_id;
+        }
+
+        return $this->establishment_id === $establishment->id;
     }
 
     public function priceLabel(): string

@@ -2,11 +2,14 @@
 
 namespace App\Filament\Resources\Modifiers\Schemas;
 
+use App\Filament\Support\LocalizedFields;
 use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Illuminate\Database\Eloquent\Builder;
 
 class ModifierForm
 {
@@ -20,7 +23,7 @@ class ModifierForm
                     ->columnSpanFull()
                     ->schema([
                         TextInput::make('name')
-                            ->label('Название')
+                            ->label('Название · RU')
                             ->required()
                             ->maxLength(255)
                             ->columnSpan([
@@ -42,6 +45,22 @@ class ModifierForm
                             ->columnSpan([
                                 'md' => 2,
                             ]),
+                        ...LocalizedFields::text('name', 'Название'),
+                        Select::make('modifier_category_id')
+                            ->label('Категория')
+                            ->relationship(
+                                'category',
+                                'name',
+                                fn (Builder $query): Builder => $query->ordered(),
+                            )
+                            ->searchable()
+                            ->preload()
+                            ->required()
+                            ->native(false)
+                            ->helperText('Топпинги / Молоко / Сиропы — как в приложении')
+                            ->columnSpan([
+                                'md' => 6,
+                            ]),
                         TextInput::make('price')
                             ->label('Цена')
                             ->required()
@@ -61,7 +80,7 @@ class ModifierForm
                             ->disk('public')
                             ->directory('modifiers')
                             ->visibility('public')
-                            ->maxSize(5120)
+                            ->maxSize(10240)
                             ->columnSpanFull(),
                     ])
                     ->columns([

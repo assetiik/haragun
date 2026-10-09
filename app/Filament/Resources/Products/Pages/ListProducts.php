@@ -44,19 +44,22 @@ class ListProducts extends ListRecords
                     ->where('kind', ProductKind::RentalSkates)),
             'haragun-cafe' => Tab::make('Кофейня')
                 ->modifyQueryUsing(fn (Builder $query): Builder => $query
+                    ->whereNotNull('brand_id')
                     ->whereHas(
-                        'establishment',
-                        fn (Builder $venueQuery): Builder => $venueQuery->where('type', EstablishmentType::IceArena),
+                        'brand',
+                        fn (Builder $brandQuery): Builder => $brandQuery->where('type', EstablishmentType::IceArena),
                     )
                     ->whereHas(
                         'menuCategory',
                         fn (Builder $categoryQuery): Builder => $categoryQuery->where('type', EstablishmentType::Coffee),
                     )),
             'cafes' => Tab::make('Кофейни')
-                ->modifyQueryUsing(fn (Builder $query): Builder => $query->whereHas(
-                    'establishment',
-                    fn (Builder $venueQuery): Builder => $venueQuery->where('type', EstablishmentType::Coffee),
-                )),
+                ->modifyQueryUsing(fn (Builder $query): Builder => $query
+                    ->whereNotNull('brand_id')
+                    ->whereHas(
+                        'brand',
+                        fn (Builder $brandQuery): Builder => $brandQuery->where('type', EstablishmentType::Coffee),
+                    )),
         ];
     }
 

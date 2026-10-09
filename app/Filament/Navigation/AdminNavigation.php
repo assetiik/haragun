@@ -7,6 +7,7 @@ use App\Enums\ProductKind;
 use App\Filament\Resources\Brands\BrandResource;
 use App\Filament\Resources\Establishments\EstablishmentResource;
 use App\Filament\Resources\MenuCategories\MenuCategoryResource;
+use App\Filament\Resources\ModifierCategories\ModifierCategoryResource;
 use App\Filament\Resources\Modifiers\ModifierResource;
 use App\Filament\Resources\Products\ProductResource;
 use App\Filament\Support\VenueSection;
@@ -55,7 +56,9 @@ final class AdminNavigation
                 resource: ProductResource::class,
                 tab: VenueSection::Haragun,
                 sort: 3,
-                typeFromRecord: fn (Model $record): ?EstablishmentType => $record instanceof Product ? $record->establishment?->type : null,
+                typeFromRecord: fn (Model $record): ?EstablishmentType => $record instanceof Product
+                    ? ($record->brand?->type ?? $record->establishment?->type)
+                    : null,
                 recordMatches: fn (Model $record): bool => $record instanceof Product
                     && $record->kind !== ProductKind::RentalSkates
                     && $record->menuCategory?->type !== EstablishmentType::Coffee,
@@ -67,7 +70,9 @@ final class AdminNavigation
                 resource: ProductResource::class,
                 tab: VenueSection::HaragunSkates,
                 sort: 4,
-                typeFromRecord: fn (Model $record): ?EstablishmentType => $record instanceof Product ? $record->establishment?->type : null,
+                typeFromRecord: fn (Model $record): ?EstablishmentType => $record instanceof Product
+                    ? ($record->brand?->type ?? $record->establishment?->type)
+                    : null,
                 recordMatches: fn (Model $record): bool => $record instanceof Product
                     && $record->kind === ProductKind::RentalSkates,
             ),
@@ -78,7 +83,9 @@ final class AdminNavigation
                 resource: ProductResource::class,
                 tab: VenueSection::HaragunCafe,
                 sort: 5,
-                typeFromRecord: fn (Model $record): ?EstablishmentType => $record instanceof Product ? $record->establishment?->type : null,
+                typeFromRecord: fn (Model $record): ?EstablishmentType => $record instanceof Product
+                    ? ($record->brand?->type ?? $record->establishment?->type)
+                    : null,
                 recordMatches: fn (Model $record): bool => $record instanceof Product
                     && $record->menuCategory?->type === EstablishmentType::Coffee,
             ),
@@ -116,7 +123,9 @@ final class AdminNavigation
                 resource: ProductResource::class,
                 tab: VenueSection::Cafes,
                 sort: 4,
-                typeFromRecord: fn (Model $record): ?EstablishmentType => $record instanceof Product ? $record->establishment?->type : null,
+                typeFromRecord: fn (Model $record): ?EstablishmentType => $record instanceof Product
+                    ? ($record->brand?->type ?? $record->establishment?->type)
+                    : null,
             ),
             self::resourceItem(
                 label: 'Добавки',
@@ -124,6 +133,13 @@ final class AdminNavigation
                 icon: Heroicon::OutlinedAdjustmentsHorizontal,
                 resource: ModifierResource::class,
                 sort: 5,
+            ),
+            self::resourceItem(
+                label: 'Категории добавок',
+                group: 'Кофейни',
+                icon: Heroicon::OutlinedSquares2x2,
+                resource: ModifierCategoryResource::class,
+                sort: 6,
             ),
         ];
     }

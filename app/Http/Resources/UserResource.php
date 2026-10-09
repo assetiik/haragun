@@ -20,9 +20,8 @@ class UserResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'phone' => $this->phone,
-            'phone_formatted' => $this->formattedPhone(),
-            'initials' => $this->initials(),
             'needs_name' => blank($this->name),
+            'notifications_enabled' => (bool) $this->notifications_enabled,
         ];
     }
 }

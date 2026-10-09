@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Enums\FeedbackRating;
-use App\Enums\FeedbackTag;
 use App\Enums\OrderStatus;
 use App\Enums\OrderType;
 use App\Http\Requests\StoreOrderFeedbackRequest;
@@ -70,18 +69,11 @@ class OrderFeedbackController extends Controller
         $order->load(['items.product', 'feedback', 'establishment']);
 
         return response()->json([
-            'message' => 'Спасибо за оценку!',
             'feedback' => [
                 'id' => $feedback->id,
                 'rating' => $feedback->rating->value,
-                'likes' => collect($feedback->likes ?? [])->map(fn (string $id) => [
-                    'id' => $id,
-                    'label' => FeedbackTag::tryFrom($id)?->label() ?? $id,
-                ])->values(),
-                'dislikes' => collect($feedback->dislikes ?? [])->map(fn (string $id) => [
-                    'id' => $id,
-                    'label' => FeedbackTag::tryFrom($id)?->label() ?? $id,
-                ])->values(),
+                'likes' => array_values($feedback->likes ?? []),
+                'dislikes' => array_values($feedback->dislikes ?? []),
                 'comment' => $feedback->comment,
             ],
             'coffee_screen' => new OrderCoffeeScreenResource($order),
@@ -102,7 +94,6 @@ class OrderFeedbackController extends Controller
         $order->load(['items.product', 'feedback', 'establishment']);
 
         return response()->json([
-            'message' => 'Заказ готов',
             'order' => new OrderDetailResource($order),
             'coffee_screen' => new OrderCoffeeScreenResource($order),
         ]);

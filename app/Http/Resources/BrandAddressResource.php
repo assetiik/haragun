@@ -26,17 +26,12 @@ class BrandAddressResource extends JsonResource
             'name' => $this->name,
             'address' => $this->address,
             'phone' => $this->phone,
-            'phone_formatted' => $this->formattedPhone(),
             'latitude' => $this->latitude,
             'longitude' => $this->longitude,
             'is_open' => $this->isOpenAt(),
-            'open_label' => $this->openStateLabel(),
-            'status_label' => $this->statusLabel(),
-            'hours_label' => $this->hoursLabel(),
             'opens_at' => $this->formattedTime($this->opens_at),
             'closes_at' => $this->formattedTime($this->closes_at),
             'distance_km' => $this->distanceKm($latitude, $longitude),
-            'distance_label' => $this->distanceLabel($latitude, $longitude),
             'is_selected' => $selectedId !== null && (int) $selectedId === $this->id,
         ];
     }

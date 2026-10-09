@@ -25,21 +25,18 @@ class RentalAndQuoteTest extends TestCase
 
         $response
             ->assertOk()
-            ->assertJsonPath('title', 'Аренда')
-            ->assertJsonPath('subtitle', 'Выдаём на стойке по коду брони')
-            ->assertJsonPath('session.label', 'сб, 14 февраля · 16:00')
+            ->assertJsonPath('session.date', '2026-02-14')
+            ->assertJsonPath('session.time', '16:00')
             ->assertJsonPath('rentals.0.id', $skates->id)
             ->assertJsonPath('rentals.0.kind', 'rental_skates')
-            ->assertJsonPath('rentals.0.action_label', 'Размеры')
             ->assertJsonPath('rentals.0.selection_mode', 'sizes')
-            ->assertJsonPath('rentals.0.size_sheet.title', 'Выберите размеры')
             ->assertJsonPath('rentals.1.id', $helmet->id)
             ->assertJsonPath('rentals.1.kind', 'rental_helmet')
             ->assertJsonPath('rentals.1.selection_mode', 'quantity');
 
         $sizes = collect($response->json('rentals.0.sizes'));
         $this->assertTrue($sizes->contains(fn (array $size) => $size['size'] === 38 && $size['is_available'] === true));
-        $this->assertTrue($sizes->contains(fn (array $size) => $size['size'] === 46 && $size['is_available'] === false && $size['status_label'] === 'нет'));
+        $this->assertTrue($sizes->contains(fn (array $size) => $size['size'] === 46 && $size['is_available'] === false));
     }
 
     public function test_quote_calculates_tickets_rentals_and_weekday_discount(): void
@@ -62,15 +59,19 @@ class RentalAndQuoteTest extends TestCase
         $response
             ->assertOk()
             ->assertJsonPath('total', 10000)
-            ->assertJsonPath('total_label', '10 000 ₸')
             ->assertJsonPath('items_count', 5)
-            ->assertJsonPath('lines.0.title', 'Взрослый × 2')
-            ->assertJsonPath('lines.1.title', 'Коньки × 2 · р. 38, р. 41')
-            ->assertJsonPath('lines.2.title', 'Шлем × 1')
-            ->assertJsonPath('lines.3.title', 'Скидка на коньки, будни')
+            ->assertJsonPath('lines.0.name', 'Взрослый')
+            ->assertJsonPath('lines.0.quantity', 2)
+            ->assertJsonPath('lines.1.name', 'Коньки')
+            ->assertJsonPath('lines.1.quantity', 2)
+            ->assertJsonPath('lines.1.sizes', [38, 41])
+            ->assertJsonPath('lines.2.name', 'Шлем')
+            ->assertJsonPath('lines.2.quantity', 1)
+            ->assertJsonPath('lines.3.code', 'weekday_skate_discount')
             ->assertJsonPath('lines.3.amount', -2500)
             ->assertJsonPath('lines.3.is_discount', true)
-            ->assertJsonPath('footer.subtitle', '5 позиций · пт, 13 · 16:00');
+            ->assertJsonPath('session.date', '2026-02-13')
+            ->assertJsonPath('session.time', '16:00');
     }
 
     public function test_quote_rejects_unavailable_skate_size(): void

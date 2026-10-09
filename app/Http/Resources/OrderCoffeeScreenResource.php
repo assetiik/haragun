@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Enums\FeedbackRating;
 use App\Enums\FeedbackTag;
 use App\Enums\OrderStatus;
 use App\Models\Order;
@@ -34,18 +35,12 @@ class OrderCoffeeScreenResource extends JsonResource
             })
             ->values();
 
-        $heroImage = $items->first()['image_url'] ?? null;
-
         $payload = [
             'screen' => $screen,
-            'title' => 'Кофе',
-            'guest_label' => $this->guestLabel(),
             'guest_number' => $this->guest_number ?? $this->number,
             'pickup_number' => $this->number,
-            'pickup_number_label' => (string) $this->number,
-            'message' => $this->coffeeMessage($screen),
             'items' => $items,
-            'hero_image_url' => $heroImage,
+            'hero_image_url' => $items->first()['image_url'] ?? null,
             'primary_action' => $this->primaryAction($screen),
             'feedback' => null,
             'has_feedback' => $this->hasFeedback(),
@@ -57,54 +52,30 @@ class OrderCoffeeScreenResource extends JsonResource
                     OrderStatus::Ready,
                     OrderStatus::Completed,
                 ], true),
-                'prompt' => 'Заказ готов. Вам понравился заказ?',
-                'likes' => [
-                    'label' => 'Что нравится?',
-                    'options' => collect(FeedbackTag::likeOptions())->map(fn (FeedbackTag $tag) => [
-                        'id' => $tag->value,
-                        'label' => $tag->label(),
-                    ])->values(),
+                'ratings' => [
+                    FeedbackRating::Positive->value,
+                    FeedbackRating::Negative->value,
                 ],
-                'dislikes' => [
-                    'label' => 'Что смущает?',
-                    'options' => collect(FeedbackTag::dislikeOptions())->map(fn (FeedbackTag $tag) => [
-                        'id' => $tag->value,
-                        'label' => $tag->label(),
-                    ])->values(),
-                ],
-                'comment' => [
-                    'required' => false,
-                    'placeholder' => 'Как нам стать лучше?',
-                ],
-                'submit_label' => 'Отправить',
-                'rate_label' => 'Оценить',
-                'close_label' => 'Закрыть',
+                'likes' => array_map(
+                    fn (FeedbackTag $tag): string => $tag->value,
+                    FeedbackTag::likeOptions(),
+                ),
+                'dislikes' => array_map(
+                    fn (FeedbackTag $tag): string => $tag->value,
+                    FeedbackTag::dislikeOptions(),
+                ),
+                'comment_required' => false,
             ];
         }
 
         return $payload;
     }
 
-    private function coffeeMessage(string $screen): string
+    private function primaryAction(string $screen): string
     {
         return match ($screen) {
-            'accepted' => 'Заказ принят и уже готовится. Заберите его на стойке выдачи по номеру',
-            'ready' => 'Заказ готов. Вам понравился заказ?',
-            'rated' => 'Спасибо за оценку!',
-            default => 'Заказ принят и уже готовится. Заберите его на стойке выдачи по номеру',
-        };
-    }
-
-    /**
-     * @return array{type: string, label: string}
-     */
-    private function primaryAction(string $screen): array
-    {
-        return match ($screen) {
-            'accepted' => ['type' => 'dismiss', 'label' => 'Понятно'],
-            'ready' => ['type' => 'close', 'label' => 'Закрыть'],
-            'rated' => ['type' => 'close', 'label' => 'Закрыть'],
-            default => ['type' => 'dismiss', 'label' => 'Понятно'],
+            'ready', 'rated' => 'close',
+            default => 'dismiss',
         };
     }
 }

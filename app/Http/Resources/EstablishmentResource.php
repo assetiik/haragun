@@ -24,15 +24,12 @@ class EstablishmentResource extends JsonResource
             'name' => $this->name,
             'address' => $this->address,
             'type' => $this->type->value,
-            'type_label' => $this->type->label(),
             'latitude' => $this->latitude,
             'longitude' => $this->longitude,
             'is_open' => $this->isOpenAt(),
-            'status_label' => $this->statusLabel(),
             'opens_at' => substr((string) $this->opens_at, 0, 5),
             'closes_at' => substr((string) $this->closes_at, 0, 5),
             'distance_km' => $this->distanceKm($latitude, $longitude),
-            'distance_label' => $this->distanceLabel($latitude, $longitude),
         ];
     }
 }

@@ -21,14 +21,27 @@ class BrandResource extends JsonResource
         $nearest = $this->nearestEstablishment($latitude, $longitude);
         $addressesCount = $this->establishments->where('is_active', true)->count();
 
+        $imageUrl = $this->publicImageUrl() ?? $nearest?->publicImageUrl();
+        $images = $this->carouselImages();
+
+        if ($images === [] && $nearest !== null) {
+            $images = $nearest->carouselImages();
+        }
+
+        if ($images === [] && $imageUrl !== null) {
+            $images = [$imageUrl];
+        }
+
         return [
             'id' => $this->id,
             'name' => $this->name,
+            'subtitle' => $this->subtitle,
             'slug' => $this->slug,
             'type' => $this->type->value,
-            'type_label' => $this->type->label(),
             'icon_key' => $this->icon_key,
             'accent_color' => $this->accent_color,
+            'image_url' => $imageUrl,
+            'images' => $images,
             'addresses_count' => $addressesCount,
             'requires_address_selection' => $addressesCount > 1,
             'default_establishment_id' => $nearest?->id,
@@ -36,9 +49,10 @@ class BrandResource extends JsonResource
                 'id' => $nearest->id,
                 'address' => $nearest->address,
                 'is_open' => $nearest->isOpenAt(),
-                'status_label' => $nearest->statusLabel(),
+                'opens_at' => $nearest->formattedTime($nearest->opens_at),
+                'closes_at' => $nearest->formattedTime($nearest->closes_at),
                 'distance_km' => $nearest->distanceKm($latitude, $longitude),
-                'distance_label' => $nearest->distanceLabel($latitude, $longitude),
+                'image_url' => $nearest->publicImageUrl() ?? $imageUrl,
             ] : null,
         ];
     }

@@ -18,10 +18,12 @@ class BannerResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'type' => 'header',
             'title' => $this->title,
             'subtitle' => $this->subtitle,
+            'button_label' => $this->button_label,
             'background_color' => $this->background_color,
-            'image_url' => $this->image_url,
+            'image_url' => $this->publicImageUrl(),
         ];
     }
 }

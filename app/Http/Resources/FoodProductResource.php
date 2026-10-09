@@ -20,13 +20,16 @@ class FoodProductResource extends JsonResource
             'id' => $this->id,
             'kind' => $this->kind->value,
             'name' => $this->name,
+            'description' => $this->description,
             'price' => $this->price,
-            'price_label' => $this->priceLabel(),
             'meta' => $this->meta,
-            'subtitle' => $this->foodSubtitle(),
             'food_section' => $this->food_section,
             'icon_key' => $this->icon_key,
+            'image_url' => $this->publicImageUrl(),
             'selection_mode' => 'quantity',
+            'sizes' => [],
+            'modifiers' => [],
+            'modifier_groups' => [],
         ];
     }
 }

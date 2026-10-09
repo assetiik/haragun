@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Banners;
 
+use App\Enums\BannerPlacement;
 use App\Filament\Resources\Banners\Pages\CreateBanner;
 use App\Filament\Resources\Banners\Pages\EditBanner;
 use App\Filament\Resources\Banners\Pages\ListBanners;
@@ -13,6 +14,7 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use UnitEnum;
 
 class BannerResource extends Resource
@@ -23,15 +25,20 @@ class BannerResource extends Resource
 
     protected static string|UnitEnum|null $navigationGroup = 'Сайт';
 
-    protected static ?string $navigationLabel = 'Баннеры';
+    protected static ?string $navigationLabel = 'Шапка';
 
-    protected static ?string $modelLabel = 'баннер';
+    protected static ?string $modelLabel = 'слайд шапки';
 
-    protected static ?string $pluralModelLabel = 'Баннеры';
+    protected static ?string $pluralModelLabel = 'Шапка';
 
     protected static ?int $navigationSort = 4;
 
     protected static ?string $recordTitleAttribute = 'title';
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->where('placement', BannerPlacement::Hero);
+    }
 
     public static function form(Schema $schema): Schema
     {
@@ -45,9 +52,7 @@ class BannerResource extends Resource
 
     public static function getRelations(): array
     {
-        return [
-            //
-        ];
+        return [];
     }
 
     public static function getPages(): array

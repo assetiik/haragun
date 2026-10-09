@@ -7,6 +7,7 @@ use App\Models\Banner;
 use App\Models\Brand;
 use App\Models\City;
 use App\Models\Establishment;
+use App\Models\PromoTile;
 use Illuminate\Database\Seeder;
 
 class HomePageSeeder extends Seeder
@@ -37,7 +38,9 @@ class HomePageSeeder extends Seeder
                 'title' => '-20% на аренду коньков',
             ],
             [
+                'placement' => 'hero',
                 'subtitle' => 'В будни до 17:00',
+                'button_label' => 'Узнать больше →',
                 'background_color' => '#6B4EFF',
                 'is_active' => true,
                 'sort_order' => 1,
@@ -47,13 +50,48 @@ class HomePageSeeder extends Seeder
         Banner::query()->updateOrCreate(
             [
                 'city_id' => $almaty->id,
-                'title' => 'Кофе в подарок',
+                'title' => 'ещё до -25%',
             ],
             [
-                'subtitle' => 'При заказе от 5000 ₸',
-                'background_color' => '#8B5E3C',
+                'placement' => 'hero',
+                'subtitle' => 'по промокоду на первый сеанс только до 30 сентября',
+                'button_label' => 'Узнать больше →',
+                'background_color' => '#1B2A4A',
                 'is_active' => true,
                 'sort_order' => 2,
+            ],
+        );
+
+        PromoTile::query()->updateOrCreate(
+            [
+                'city_id' => $almaty->id,
+                'title' => '-20% на коньки в будни',
+            ],
+            [
+                'is_active' => true,
+                'sort_order' => 1,
+            ],
+        );
+
+        PromoTile::query()->updateOrCreate(
+            [
+                'city_id' => $almaty->id,
+                'title' => '6-й кофе в подарок',
+            ],
+            [
+                'is_active' => true,
+                'sort_order' => 2,
+            ],
+        );
+
+        PromoTile::query()->updateOrCreate(
+            [
+                'city_id' => $almaty->id,
+                'title' => 'Ночной сеанс с 21:00',
+            ],
+            [
+                'is_active' => true,
+                'sort_order' => 3,
             ],
         );
 

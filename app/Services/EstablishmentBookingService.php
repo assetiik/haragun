@@ -8,31 +8,22 @@ use Carbon\CarbonInterface;
 
 class EstablishmentBookingService
 {
-    private const WEEKDAYS = [
-        0 => 'вс',
-        1 => 'пн',
-        2 => 'вт',
-        3 => 'ср',
-        4 => 'чт',
-        5 => 'пт',
-        6 => 'сб',
-    ];
+    private const BOOKING_DAYS = 30;
 
     /**
-     * @return list<array{date: string, weekday_short: string, day: int, is_available: bool}>
+     * @return list<array{date: string, weekday: int, day: int, is_available: bool}>
      */
     public function dates(Establishment $establishment, ?CarbonInterface $from = null): array
     {
         $from ??= now()->startOfDay();
-        $days = max(1, $establishment->booking_days_ahead);
 
         $dates = [];
 
-        for ($i = 0; $i < $days; $i++) {
+        for ($i = 0; $i < self::BOOKING_DAYS; $i++) {
             $date = $from->copy()->addDays($i);
             $dates[] = [
                 'date' => $date->toDateString(),
-                'weekday_short' => self::WEEKDAYS[$date->dayOfWeek],
+                'weekday' => $date->dayOfWeek,
                 'day' => $date->day,
                 'is_available' => true,
             ];

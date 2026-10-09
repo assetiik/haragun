@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Models\Modifier;
+use App\Models\ModifierCategory;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -16,6 +17,7 @@ class ModifierFactory extends Factory
     public function definition(): array
     {
         return [
+            'modifier_category_id' => ModifierCategory::factory(),
             'name' => fake()->unique()->words(2, true),
             'price' => fake()->numberBetween(100, 1500),
             'image_url' => null,

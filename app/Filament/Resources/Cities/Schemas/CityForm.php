@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Cities\Schemas;
 
+use App\Filament\Support\LocalizedFields;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
@@ -19,7 +20,7 @@ class CityForm
                     ->columnSpanFull()
                     ->schema([
                         TextInput::make('name')
-                            ->label('Название')
+                            ->label('Название · RU')
                             ->required()
                             ->maxLength(120)
                             ->columnSpan([
@@ -40,6 +41,7 @@ class CityForm
                             ->columnSpan([
                                 'md' => 2,
                             ]),
+                        ...LocalizedFields::text('name', 'Название', 120),
                     ])
                     ->columns([
                         'default' => 1,

@@ -158,7 +158,129 @@ HTML;
                         return '';
                     }
 
-                    return '<link rel="stylesheet" href="'.asset('css/haragun-admin.css').'?v=26">';
+                    return implode('', [
+                        '<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />',
+                        '<link rel="stylesheet" href="'.asset('css/haragun-admin.css').'?v=26">',
+                    ]);
+                },
+            )
+            ->renderHook(
+                PanelsRenderHook::SCRIPTS_AFTER,
+                function (): string {
+                    if (request()->routeIs('filament.admin.auth.login')) {
+                        return '';
+                    }
+
+                    return <<<'HTML'
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+(() => {
+    const register = () => {
+        Alpine.data('haragunLocationMap', (config) => ({
+            map: null,
+            marker: null,
+            latPath: config.latPath,
+            lngPath: config.lngPath,
+            defaultLat: config.defaultLat,
+            defaultLng: config.defaultLng,
+            defaultZoom: config.defaultZoom,
+
+            init() {
+                this.$nextTick(() => this.boot())
+            },
+
+            readNumber(path) {
+                const value = this.$wire.get(path)
+                const number = typeof value === 'number' ? value : parseFloat(value)
+
+                return Number.isFinite(number) ? number : null
+            },
+
+            write(lat, lng) {
+                this.$wire.set(this.latPath, Number(lat.toFixed(7)))
+                this.$wire.set(this.lngPath, Number(lng.toFixed(7)))
+            },
+
+            boot() {
+                if (typeof L === 'undefined' || this.map) {
+                    return
+                }
+
+                const initialLat = this.readNumber(this.latPath) ?? this.defaultLat
+                const initialLng = this.readNumber(this.lngPath) ?? this.defaultLng
+
+                this.map = L.map(this.$refs.map).setView([initialLat, initialLng], this.defaultZoom)
+
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '&copy; OpenStreetMap',
+                }).addTo(this.map)
+
+                this.marker = L.marker([initialLat, initialLng], { draggable: true }).addTo(this.map)
+
+                this.marker.on('dragend', () => {
+                    const { lat, lng } = this.marker.getLatLng()
+                    this.write(lat, lng)
+                })
+
+                this.map.on('click', (event) => {
+                    this.marker.setLatLng(event.latlng)
+                    this.write(event.latlng.lat, event.latlng.lng)
+                })
+
+                this.$wire.$watch(this.latPath, () => this.syncFromInputs())
+                this.$wire.$watch(this.lngPath, () => this.syncFromInputs())
+
+                setTimeout(() => this.map.invalidateSize(), 200)
+            },
+
+            syncFromInputs() {
+                if (! this.map || ! this.marker) {
+                    return
+                }
+
+                const lat = this.readNumber(this.latPath)
+                const lng = this.readNumber(this.lngPath)
+
+                if (lat === null || lng === null) {
+                    return
+                }
+
+                const current = this.marker.getLatLng()
+
+                if (Math.abs(current.lat - lat) < 0.0000001 && Math.abs(current.lng - lng) < 0.0000001) {
+                    return
+                }
+
+                this.marker.setLatLng([lat, lng])
+                this.map.panTo([lat, lng])
+            },
+
+            useMyLocation() {
+                if (! navigator.geolocation) {
+                    return
+                }
+
+                navigator.geolocation.getCurrentPosition((position) => {
+                    const lat = position.coords.latitude
+                    const lng = position.coords.longitude
+
+                    this.marker.setLatLng([lat, lng])
+                    this.map.setView([lat, lng], Math.max(this.map.getZoom(), 15))
+                    this.write(lat, lng)
+                })
+            },
+        }))
+    }
+
+    if (window.Alpine) {
+        register()
+    } else {
+        document.addEventListener('alpine:init', register)
+    }
+})()
+</script>
+HTML;
                 },
             )
             ->renderHook(

@@ -6,17 +6,35 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['phone', 'name'])]
+#[Fillable(['phone', 'name', 'notifications_enabled'])]
 #[Hidden(['remember_token'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
+
+    /**
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'notifications_enabled' => true,
+    ];
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'notifications_enabled' => 'boolean',
+        ];
+    }
 
     public function orders(): HasMany
     {
@@ -26,6 +44,14 @@ class User extends Authenticatable
     public function carts(): HasMany
     {
         return $this->hasMany(Cart::class);
+    }
+
+    public function favoriteEstablishments(): BelongsToMany
+    {
+        return $this->belongsToMany(Establishment::class, 'favorites')
+            ->withTimestamps()
+            ->orderByPivot('created_at', 'desc')
+            ->orderByPivot('id', 'desc');
     }
 
     /**

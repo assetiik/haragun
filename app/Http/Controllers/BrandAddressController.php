@@ -51,7 +51,6 @@ class BrandAddressController extends Controller
         $selected = $addresses->firstWhere('id', $selectedId) ?? $addresses->first();
 
         return response()->json([
-            'title' => 'Адреса',
             'brand' => [
                 'id' => $brand->id,
                 'name' => $brand->name,
@@ -78,20 +77,6 @@ class BrandAddressController extends Controller
             'selected_address' => $selected
                 ? new BrandAddressResource($selected)
                 : null,
-            'actions' => [
-                [
-                    'type' => 'show_on_map',
-                    'label' => 'Показать на карте',
-                ],
-                [
-                    'type' => 'select_address',
-                    'label' => 'Выбрать этот адрес',
-                ],
-                [
-                    'type' => 'show_list',
-                    'label' => 'Список',
-                ],
-            ],
         ]);
     }
 

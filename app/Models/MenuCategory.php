@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\EstablishmentType;
+use App\Models\Concerns\HasI18n;
 use App\Support\Slugger;
 use Database\Factories\MenuCategoryFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -27,11 +28,22 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'requires_booking',
     'is_active',
     'sort_order',
+    'i18n',
 ])]
 class MenuCategory extends Model
 {
     /** @use HasFactory<MenuCategoryFactory> */
     use HasFactory;
+
+    use HasI18n;
+
+    /**
+     * @return list<string>
+     */
+    protected function translatableAttributes(): array
+    {
+        return ['name', 'section_title', 'section_subtitle', 'header_title', 'header_subtitle'];
+    }
 
     /**
      * @return array<string, string>
@@ -44,6 +56,7 @@ class MenuCategory extends Model
             'is_active' => 'boolean',
             'sort_order' => 'integer',
             'prep_minutes' => 'integer',
+            'i18n' => 'array',
         ];
     }
 
@@ -100,11 +113,11 @@ class MenuCategory extends Model
             }
 
             $category->slug = Slugger::unique(
-                match (mb_strtolower(trim((string) $category->name))) {
+                match (mb_strtolower(trim($category->stored('name')))) {
                     'чай' => 'tea',
                     'кофе' => 'coffee',
                     'лимонад' => 'lemonade',
-                    default => (string) $category->name,
+                    default => $category->stored('name'),
                 },
                 self::class,
                 scope: ['type' => $category->type],

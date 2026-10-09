@@ -2,9 +2,12 @@
 
 namespace App\Filament\Resources\Products\Schemas;
 
+use App\Enums\EstablishmentType;
+use App\Filament\Support\LocalizedFields;
 use App\Filament\Support\VenueSection;
 use App\Models\Establishment;
 use App\Models\Modifier;
+use App\Models\Product;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Repeater\TableColumn;
@@ -35,7 +38,7 @@ class ProductForm
                     ->columnSpanFull()
                     ->schema([
                         TextInput::make('name')
-                            ->label('Название')
+                            ->label('Название · RU')
                             ->required()
                             ->maxLength(255)
                             ->columnSpan([
@@ -57,6 +60,29 @@ class ProductForm
                             ->columnSpan([
                                 'md' => 2,
                             ]),
+                        ...LocalizedFields::text('name', 'Название'),
+                        Select::make('brand_id')
+                            ->label('Бренд')
+                            ->relationship(
+                                'brand',
+                                'name',
+                                fn (Builder $query): Builder => $query
+                                    ->when(
+                                        VenueSection::type(),
+                                        fn (Builder $brandQuery, EstablishmentType $type): Builder => $brandQuery->where('type', $type),
+                                    )
+                                    ->ordered(),
+                            )
+                            ->native(false)
+                            ->preload()
+                            ->searchable()
+                            ->required(fn ($livewire): bool => self::isBrandMenuForm($livewire))
+                            ->visible(fn ($livewire): bool => self::isBrandMenuForm($livewire))
+                            ->dehydrated(fn ($livewire): bool => self::isBrandMenuForm($livewire))
+                            ->helperText('Меню общее для всех точек бренда')
+                            ->columnSpan([
+                                'md' => 6,
+                            ]),
                         Select::make('establishment_id')
                             ->label('Заведение')
                             ->relationship(
@@ -69,7 +95,9 @@ class ProductForm
                             )
                             ->native(false)
                             ->preload()
-                            ->required()
+                            ->required(fn ($livewire): bool => ! self::isBrandMenuForm($livewire))
+                            ->visible(fn ($livewire): bool => ! self::isBrandMenuForm($livewire))
+                            ->dehydrated(fn ($livewire): bool => ! self::isBrandMenuForm($livewire))
                             ->default(fn (): ?int => VenueSection::defaultEstablishmentId())
                             ->columnSpan([
                                 'md' => 6,
@@ -235,9 +263,10 @@ class ProductForm
                             ->visible(fn ($livewire): bool => self::isSkateForm($livewire))
                             ->columnSpanFull(),
                         Textarea::make('description')
-                            ->label('Описание')
+                            ->label('Описание · RU')
                             ->rows(3)
                             ->columnSpanFull(),
+                        ...LocalizedFields::textarea('description', 'Описание'),
                         FileUpload::make('image_url')
                             ->label('Фото')
                             ->image()
@@ -245,14 +274,16 @@ class ProductForm
                             ->disk('public')
                             ->directory('products')
                             ->visibility('public')
-                            ->maxSize(5120)
+                            ->maxSize(10240)
                             ->columnSpanFull(),
                         Select::make('modifiers')
                             ->label('Добавки')
                             ->relationship(
                                 'modifiers',
                                 'name',
-                                fn (Builder $query): Builder => $query->orderBy('sort_order')->orderBy('name'),
+                                fn (Builder $query): Builder => $query
+                                    ->orderBy($query->qualifyColumn('sort_order'))
+                                    ->orderBy($query->qualifyColumn('name')),
                             )
                             ->getOptionLabelFromRecordUsing(
                                 fn (Modifier $record): string => $record->name.' · '.$record->priceLabel()
@@ -264,24 +295,6 @@ class ProductForm
                             ->visible(fn ($livewire): bool => self::isCoffeeForm($livewire))
                             ->dehydrated(fn ($livewire): bool => self::isCoffeeForm($livewire))
                             ->columnSpanFull(),
-                        Toggle::make('is_popular')
-                            ->label('В популярных')
-                            ->default(false)
-                            ->inline(false)
-                            ->visible(fn ($livewire): bool => self::isCoffeeForm($livewire))
-                            ->dehydrated(fn ($livewire): bool => self::isCoffeeForm($livewire))
-                            ->columnSpan([
-                                'md' => 6,
-                            ]),
-                        Toggle::make('is_featured')
-                            ->label('На главном баннере')
-                            ->default(false)
-                            ->inline(false)
-                            ->visible(fn ($livewire): bool => self::isCoffeeForm($livewire))
-                            ->dehydrated(fn ($livewire): bool => self::isCoffeeForm($livewire))
-                            ->columnSpan([
-                                'md' => 6,
-                            ]),
                     ])
                     ->columns([
                         'default' => 1,
@@ -369,6 +382,19 @@ class ProductForm
             $livewire->record ?? null,
             $livewire->venueTab ?? null,
         );
+    }
+
+    private static function isBrandMenuForm(object $livewire): bool
+    {
+        $tab = $livewire->venueTab ?? VenueSection::fromRequest();
+
+        if (in_array($tab, [VenueSection::Cafes, VenueSection::HaragunCafe], true)) {
+            return true;
+        }
+
+        $record = $livewire->record ?? null;
+
+        return $record instanceof Product && $record->brand_id !== null;
     }
 
     private static function isSkateForm(object $livewire): bool

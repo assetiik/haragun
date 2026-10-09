@@ -13,10 +13,18 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
+            AdminSeeder::class,
+        ]);
+
+        // Demo catalog seeders are manual-only — never auto-run on production deploys.
+        if (! app()->isLocal()) {
+            return;
+        }
+
+        $this->call([
             HomePageSeeder::class,
             EstablishmentCatalogSeeder::class,
             CoffeeMenuSeeder::class,
-            AdminSeeder::class,
         ]);
 
         User::factory()->create([

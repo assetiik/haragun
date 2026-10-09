@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Banners\Tables;
 
+use App\Models\Banner;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
@@ -18,6 +19,9 @@ class BannersTable
         return $table
             ->defaultSort('sort_order')
             ->columns([
+                ImageColumn::make('image_url')
+                    ->label('Фото')
+                    ->getStateUsing(fn (Banner $record): ?string => $record->publicImageUrl()),
                 TextColumn::make('title')
                     ->label('Заголовок')
                     ->searchable()
@@ -32,18 +36,12 @@ class BannersTable
                     ->placeholder('Все')
                     ->searchable()
                     ->sortable(),
-                ImageColumn::make('image_url')
-                    ->label('Изображение')
-                    ->toggleable(),
                 IconColumn::make('is_active')
                     ->label('Активен')
                     ->boolean(),
                 TextColumn::make('sort_order')
                     ->label('Сорт.')
                     ->sortable(),
-            ])
-            ->filters([
-                //
             ])
             ->recordActions([
                 EditAction::make()->label('Изменить'),

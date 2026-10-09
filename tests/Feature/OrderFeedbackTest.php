@@ -40,10 +40,8 @@ class OrderFeedbackTest extends TestCase
         $response
             ->assertCreated()
             ->assertJsonPath('coffee_screen.screen', 'accepted')
-            ->assertJsonPath('coffee_screen.title', 'Кофе')
-            ->assertJsonPath('coffee_screen.guest_label', 'Гость '.$user->guestNumber())
-            ->assertJsonPath('coffee_screen.message', 'Заказ принят и уже готовится. Заберите его на стойке выдачи по номеру')
-            ->assertJsonPath('coffee_screen.primary_action.label', 'Понятно')
+            ->assertJsonPath('coffee_screen.guest_number', $user->guestNumber())
+            ->assertJsonPath('coffee_screen.primary_action', 'dismiss')
             ->assertJsonPath('coffee_screen.items.0.name', 'Латте')
             ->assertJsonPath('coffee_screen.items.0.image_url', 'https://example.com/latte.jpg')
             ->assertJsonPath('order.guest_number', $user->guestNumber());
@@ -63,9 +61,10 @@ class OrderFeedbackTest extends TestCase
             ->assertOk()
             ->assertJsonPath('coffee_screen.screen', 'ready')
             ->assertJsonPath('coffee_screen.feedback.enabled', true)
-            ->assertJsonPath('coffee_screen.feedback.comment.required', false)
-            ->assertJsonPath('coffee_screen.feedback.prompt', 'Заказ готов. Вам понравился заказ?')
-            ->assertJsonPath('coffee_screen.primary_action.label', 'Закрыть');
+            ->assertJsonPath('coffee_screen.feedback.comment_required', false)
+            ->assertJsonPath('coffee_screen.feedback.ratings.0', 'positive')
+            ->assertJsonPath('coffee_screen.feedback.ratings.1', 'negative')
+            ->assertJsonPath('coffee_screen.primary_action', 'close');
 
         $this->postJson("/api/orders/{$order->id}/feedback", [
             'rating' => 'positive',
@@ -73,7 +72,8 @@ class OrderFeedbackTest extends TestCase
             'dislikes' => [],
         ])
             ->assertCreated()
-            ->assertJsonPath('message', 'Спасибо за оценку!')
+            ->assertJsonPath('feedback.rating', 'positive')
+            ->assertJsonPath('feedback.likes.0', 'taste')
             ->assertJsonPath('coffee_screen.screen', 'rated')
             ->assertJsonPath('feedback.comment', null);
 
@@ -122,6 +122,32 @@ class OrderFeedbackTest extends TestCase
         $this->postJson("/api/orders/{$order->id}/feedback", [
             'rating' => 'positive',
         ])->assertUnprocessable();
+    }
+
+    public function test_like_button_can_submit_rating_only(): void
+    {
+        [$user, $establishment] = $this->seedCoffee();
+        $order = $this->makeVenueOrder($user, $establishment, OrderStatus::Ready);
+
+        Sanctum::actingAs($user);
+
+        $this->postJson("/api/orders/{$order->id}/feedback", [
+            'rating' => 'positive',
+        ])
+            ->assertCreated()
+            ->assertJsonPath('feedback.rating', 'positive')
+            ->assertJsonPath('coffee_screen.screen', 'rated')
+            ->assertJsonPath('coffee_screen.feedback.enabled', false);
+
+        $this->assertDatabaseHas('order_feedback', [
+            'order_id' => $order->id,
+            'rating' => 'positive',
+        ]);
+
+        $this->assertDatabaseHas('orders', [
+            'id' => $order->id,
+            'status' => OrderStatus::Completed->value,
+        ]);
     }
 
     /**

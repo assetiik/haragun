@@ -23,10 +23,13 @@ class BrandFactory extends Factory
         return [
             'city_id' => City::factory(),
             'name' => $name,
+            'subtitle' => null,
             'slug' => Str::slug($name).'-'.fake()->unique()->numerify('###'),
             'type' => EstablishmentType::Coffee,
             'icon_key' => 'coffee',
             'accent_color' => '#C26E40',
+            'image_url' => null,
+            'images' => null,
             'is_active' => true,
             'sort_order' => 0,
         ];

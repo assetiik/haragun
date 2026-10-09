@@ -2,7 +2,10 @@
 
 namespace App\Filament\Resources\Banners\Schemas;
 
+use App\Filament\Support\LocalizedFields;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
@@ -16,11 +19,13 @@ class BannerForm
             ->columns(1)
             ->extraAttributes(['class' => 'fi-fixed-positioning-context'])
             ->components([
-                Section::make('Баннер')
+                Section::make('Слайд шапки')
+                    ->description('Каждая запись — один слайд карусели на главной. Добавьте несколько слайдов для листания.')
                     ->columnSpanFull()
                     ->schema([
                         TextInput::make('title')
-                            ->label('Заголовок')
+                            ->label('Заголовок · RU')
+                            ->helperText('Например: «ещё до -25%»')
                             ->required()
                             ->maxLength(255)
                             ->columnSpan([
@@ -28,6 +33,7 @@ class BannerForm
                             ]),
                         TextInput::make('sort_order')
                             ->label('Порядок')
+                            ->helperText('1, 2, 3… — порядок в карусели')
                             ->required()
                             ->numeric()
                             ->integer()
@@ -42,25 +48,34 @@ class BannerForm
                             ->columnSpan([
                                 'md' => 2,
                             ]),
+                        ...LocalizedFields::text('title', 'Заголовок'),
                         Select::make('city_id')
                             ->label('Город')
                             ->relationship('city', 'name')
                             ->searchable()
                             ->preload()
                             ->placeholder('Все города')
-                            ->columnSpan([
-                                'md' => 6,
-                            ]),
-                        TextInput::make('subtitle')
-                            ->label('Подзаголовок')
-                            ->maxLength(255)
-                            ->columnSpan([
-                                'md' => 6,
-                            ]),
-                        TextInput::make('image_url')
-                            ->label('Ссылка на фото')
-                            ->url()
-                            ->maxLength(2048)
+                            ->columnSpanFull(),
+                        Textarea::make('subtitle')
+                            ->label('Подзаголовок · RU')
+                            ->helperText('Текст под заголовком на слайде')
+                            ->rows(2)
+                            ->columnSpanFull(),
+                        ...LocalizedFields::textarea('subtitle', 'Подзаголовок'),
+                        TextInput::make('button_label')
+                            ->label('Текст кнопки · RU')
+                            ->placeholder('Узнать больше →')
+                            ->maxLength(100)
+                            ->columnSpanFull(),
+                        ...LocalizedFields::text('button_label', 'Текст кнопки', 100),
+                        FileUpload::make('image_url')
+                            ->label('Фото слайда')
+                            ->image()
+                            ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
+                            ->disk('public')
+                            ->directory('banners')
+                            ->visibility('public')
+                            ->maxSize(10240)
                             ->columnSpanFull(),
                     ])
                     ->columns([

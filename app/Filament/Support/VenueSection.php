@@ -88,10 +88,23 @@ final class VenueSection
             return self::HaragunCafe;
         }
 
+        if ($record instanceof Product && $record->brand_id !== null) {
+            if ($record->brand?->type === EstablishmentType::Coffee) {
+                return self::Cafes;
+            }
+
+            if (
+                $record->brand?->type === EstablishmentType::IceArena
+                && $record->menuCategory?->type === EstablishmentType::Coffee
+            ) {
+                return self::HaragunCafe;
+            }
+        }
+
         $type = match (true) {
             $record instanceof Brand, $record instanceof Establishment => $record->type,
             $record instanceof MenuCategory => $record->type ?? $record->establishment?->type,
-            $record instanceof Product => $record->establishment?->type,
+            $record instanceof Product => $record->establishment?->type ?? $record->brand?->type,
             default => null,
         };
 

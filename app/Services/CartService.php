@@ -15,7 +15,6 @@ use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\ProductSize;
 use App\Models\User;
-use App\Support\Money;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -212,18 +211,13 @@ class CartService
     }
 
     /**
-     * @return array{items_count: int, total: int, total_label: string, label: string}
+     * @return array{items_count: int, total: int}
      */
     public function summary(?Cart $cart): array
     {
-        $count = $cart?->itemsCount() ?? 0;
-        $total = $cart?->total() ?? 0;
-
         return [
-            'items_count' => $count,
-            'total' => $total,
-            'total_label' => Money::format($total),
-            'label' => "Корзина · {$count} шт",
+            'items_count' => $cart?->itemsCount() ?? 0,
+            'total' => $cart?->total() ?? 0,
         ];
     }
 
@@ -245,22 +239,11 @@ class CartService
             return null;
         }
 
-        $statusLabel = match ($order->status) {
-            OrderStatus::Accepted => 'Принят',
-            OrderStatus::Preparing => 'Готовится',
-            OrderStatus::Ready => 'Готов',
-            default => $order->status->value,
-        };
-
         return [
             'id' => $order->id,
             'number' => $order->number,
-            'number_label' => $order->numberLabel(),
             'code' => $order->code,
             'status' => $order->status->value,
-            'status_label' => $statusLabel,
-            'title' => $order->statusBanner()['title'],
-            'subtitle' => $order->statusBanner()['subtitle'],
         ];
     }
 
@@ -278,27 +261,33 @@ class CartService
     public function priceLine(int $establishmentId, int $productId, ?int $sizeId, array $modifierIds): array
     {
         $product = Product::query()
-            ->with(['sizes', 'modifiers' => fn ($query) => $query->active()])
-            ->where('establishment_id', $establishmentId)
-            ->coffeeMenu()
+            ->with(['sizes', 'modifiers' => fn ($query) => $query->active(), 'menuCategory'])
+            ->availableAt(Establishment::query()->findOrFail($establishmentId))
+            ->venueCart()
             ->active()
             ->findOrFail($productId);
 
+        $isFoodCourt = $product->menuCategory?->isFoodCourt() ?? false;
+
         $size = null;
-        if ($sizeId !== null) {
-            $size = $product->sizes->firstWhere('id', $sizeId);
-            if ($size === null) {
-                throw ValidationException::withMessages([
-                    'size_id' => ['Выбранный размер недоступен.'],
-                ]);
+        if (! $isFoodCourt) {
+            if ($sizeId !== null) {
+                $size = $product->sizes->firstWhere('id', $sizeId);
+                if ($size === null) {
+                    throw ValidationException::withMessages([
+                        'size_id' => ['Выбранный размер недоступен.'],
+                    ]);
+                }
+            } else {
+                $size = $product->defaultSize();
             }
-        } else {
-            $size = $product->defaultSize();
         }
 
         $unitPrice = $size?->price ?? $product->price;
         $modifiers = [];
-        $normalizedIds = collect($modifierIds)->map(fn ($id) => (int) $id)->unique()->sort()->values();
+        $normalizedIds = $isFoodCourt
+            ? collect()
+            : collect($modifierIds)->map(fn ($id) => (int) $id)->unique()->sort()->values();
 
         foreach ($normalizedIds as $modifierId) {
             $modifier = Modifier::query()

@@ -23,13 +23,15 @@ class FoodCourtTest extends TestCase
             ->assertOk()
             ->assertJsonPath('header.title', 'Фудкорт')
             ->assertJsonPath('header.subtitle', 'Заберёте у стойки — попадёт в тот же чек')
-            ->assertJsonPath('badges.1.label', 'Готовим за 5 минут')
-            ->assertJsonPath('sections.0.title', 'Напитки')
+            ->assertJsonPath('prep_minutes', 5)
+            ->assertJsonPath('sections.0.key', 'Напитки')
             ->assertJsonPath('sections.0.products.0.name', 'Капучино')
-            ->assertJsonPath('sections.0.products.0.subtitle', '1 200 ₸ · 250 мл')
-            ->assertJsonPath('sections.1.title', 'Перекус')
+            ->assertJsonPath('sections.0.products.0.price', 1200)
+            ->assertJsonPath('sections.0.products.0.meta', '250 мл')
+            ->assertJsonPath('sections.1.key', 'Перекус')
             ->assertJsonPath('sections.1.products.0.name', 'Хот-дог')
-            ->assertJsonPath('session.short_label', 'сб, 14 · 16:00');
+            ->assertJsonPath('session.date', '2026-02-14')
+            ->assertJsonPath('session.time', '16:00');
     }
 
     public function test_quote_groups_buffet_separately(): void
@@ -47,12 +49,11 @@ class FoodCourtTest extends TestCase
             ],
         ])
             ->assertOk()
-            ->assertJsonPath('receipt_groups.0.title', 'Билеты и аренда')
+            ->assertJsonPath('receipt_groups.0.key', 'tickets_and_rentals')
             ->assertJsonPath('receipt_groups.0.amount', 5000)
-            ->assertJsonPath('receipt_groups.1.title', 'Буфет')
+            ->assertJsonPath('receipt_groups.1.key', 'buffet')
             ->assertJsonPath('receipt_groups.1.amount', 2600)
-            ->assertJsonPath('total', 7600)
-            ->assertJsonPath('food_note', 'Заберёте у стойки — попадёт в тот же чек');
+            ->assertJsonPath('total', 7600);
     }
 
     /**
