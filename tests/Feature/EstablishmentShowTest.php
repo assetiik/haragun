@@ -110,6 +110,56 @@ class EstablishmentShowTest extends TestCase
         $this->assertTrue($response->json('establishment.parking_is_free'));
     }
 
+    public function test_ticket_price_follows_weekday_or_weekend(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-10-12 11:00:00'));
+
+        $arena = Establishment::factory()->create([
+            'type' => EstablishmentType::IceArena,
+            'opens_at' => '10:00:00',
+            'closes_at' => '22:00:00',
+        ]);
+
+        $ice = MenuCategory::factory()->create([
+            'establishment_id' => $arena->id,
+            'slug' => 'ice_rental',
+            'requires_booking' => true,
+        ]);
+
+        Product::factory()->create([
+            'establishment_id' => $arena->id,
+            'menu_category_id' => $ice->id,
+            'kind' => ProductKind::Ticket,
+            'name' => 'Взрослый',
+            'price' => 4000,
+            'weekend_price' => 6000,
+            'sort_order' => 1,
+        ]);
+
+        Product::factory()->create([
+            'establishment_id' => $arena->id,
+            'menu_category_id' => $ice->id,
+            'kind' => ProductKind::Ticket,
+            'name' => 'Детский',
+            'price' => 2000,
+            'weekend_price' => 3000,
+            'sort_order' => 2,
+        ]);
+
+        $this->getJson("/api/establishments/{$arena->id}?category=ice_rental&date=2026-10-12")
+            ->assertOk()
+            ->assertJsonPath('products.0.name', 'Взрослый')
+            ->assertJsonPath('products.0.price', 4000)
+            ->assertJsonPath('products.1.name', 'Детский')
+            ->assertJsonPath('products.1.price', 2000);
+
+        $this->getJson("/api/establishments/{$arena->id}?category=ice_rental&date=2026-10-17")
+            ->assertOk()
+            ->assertJsonPath('selected_date', '2026-10-17')
+            ->assertJsonPath('products.0.price', 6000)
+            ->assertJsonPath('products.1.price', 3000);
+    }
+
     public function test_show_can_switch_to_foodcourt_category_without_slots(): void
     {
         $arena = Establishment::factory()->create([

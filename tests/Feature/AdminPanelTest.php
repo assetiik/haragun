@@ -649,7 +649,8 @@ class AdminPanelTest extends TestCase
                 'is_active' => true,
                 'establishment_id' => $arena->id,
                 'menu_category_id' => $category->id,
-                'price' => 2500,
+                'price' => 4000,
+                'weekend_price' => 6000,
             ])
             ->call('create')
             ->assertHasNoFormErrors();
@@ -659,7 +660,8 @@ class AdminPanelTest extends TestCase
         $this->assertNotNull($product);
         $this->assertSame(ProductKind::Ticket, $product->kind);
         $this->assertNull($product->food_section);
-        $this->assertSame(2500, $product->price);
+        $this->assertSame(4000, $product->price);
+        $this->assertSame(6000, $product->weekend_price);
     }
 
     public function test_creating_a_foodcourt_item_sets_food_kind_from_the_category(): void
@@ -717,6 +719,7 @@ class AdminPanelTest extends TestCase
             ->assertFormFieldDoesNotExist('is_popular')
             ->assertFormFieldDoesNotExist('is_featured')
             ->assertFormFieldIsVisible('price')
+            ->assertFormFieldIsVisible('weekend_price')
             ->assertFormFieldIsVisible('skateSizes')
             ->fillForm([
                 'name' => 'Коньки',
@@ -725,6 +728,7 @@ class AdminPanelTest extends TestCase
                 'establishment_id' => $arena->id,
                 'menu_category_id' => $category->id,
                 'price' => 2500,
+                'weekend_price' => 3500,
                 'skateSizes' => [
                     [
                         'size' => 38,
@@ -751,6 +755,8 @@ class AdminPanelTest extends TestCase
 
         $this->assertNotNull($product);
         $this->assertSame(ProductKind::RentalSkates, $product->kind);
+        $this->assertSame(2500, $product->price);
+        $this->assertSame(3500, $product->weekend_price);
         $this->assertTrue($product->requires_size);
         $this->assertSame(38, $product->size_min);
         $this->assertSame(46, $product->size_max);

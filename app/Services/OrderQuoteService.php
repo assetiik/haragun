@@ -48,7 +48,7 @@ class OrderQuoteService
                 ]);
             }
 
-            $lines->push($this->buildLine($product, $item));
+            $lines->push($this->buildLine($product, $item, $date));
         }
 
         $discountLines = $this->discounts($lines, $date);
@@ -82,7 +82,7 @@ class OrderQuoteService
      * @param  array{product_id: int, quantity?: int, sizes?: list<int>}  $item
      * @return array<string, mixed>
      */
-    private function buildLine(Product $product, array $item): array
+    private function buildLine(Product $product, array $item, Carbon $date): array
     {
         if ($product->kind === ProductKind::RentalSkates) {
             $sizes = collect($item['sizes'] ?? [])->map(fn ($size) => (int) $size)->values();
@@ -107,14 +107,15 @@ class OrderQuoteService
             }
 
             $quantity = $sizes->count();
-            $amount = $quantity * $product->price;
+            $unitPrice = $product->priceOn($date);
+            $amount = $quantity * $unitPrice;
 
             return [
                 'product_id' => $product->id,
                 'kind' => $product->kind->value,
                 'name' => $product->name,
                 'quantity' => $quantity,
-                'unit_price' => $product->price,
+                'unit_price' => $unitPrice,
                 'amount' => $amount,
                 'sizes' => $sizes->all(),
                 'is_discount' => false,
@@ -122,14 +123,15 @@ class OrderQuoteService
         }
 
         $quantity = max(1, (int) ($item['quantity'] ?? 1));
-        $amount = $quantity * $product->price;
+        $unitPrice = $product->priceOn($date);
+        $amount = $quantity * $unitPrice;
 
         return [
             'product_id' => $product->id,
             'kind' => $product->kind->value,
             'name' => $product->name,
             'quantity' => $quantity,
-            'unit_price' => $product->price,
+            'unit_price' => $unitPrice,
             'amount' => $amount,
             'sizes' => [],
             'is_discount' => false,

@@ -7,6 +7,7 @@ use App\Enums\ProductKind;
 use App\Models\Concerns\HasI18n;
 use App\Support\Money;
 use App\Support\StoredUrl;
+use Carbon\CarbonInterface;
 use Database\Factories\ProductFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -16,6 +17,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 #[Fillable([
     'establishment_id',
@@ -27,6 +29,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'size_max',
     'name',
     'price',
+    'weekend_price',
     'meta',
     'description',
     'image_url',
@@ -66,6 +69,7 @@ class Product extends Model
             'size_min' => 'integer',
             'size_max' => 'integer',
             'price' => 'integer',
+            'weekend_price' => 'integer',
             'age_from' => 'integer',
             'is_popular' => 'boolean',
             'is_featured' => 'boolean',
@@ -195,6 +199,21 @@ class Product extends Model
         }
 
         return $this->establishment_id === $establishment->id;
+    }
+
+    public function priceOn(CarbonInterface|string|null $date): int
+    {
+        if (! $this->kind->chargesByDay() || $date === null || $this->weekend_price === null) {
+            return $this->price;
+        }
+
+        $day = $date instanceof CarbonInterface ? $date : Carbon::parse($date);
+
+        if ($day->isWeekend()) {
+            return $this->weekend_price;
+        }
+
+        return $this->price;
     }
 
     public function priceLabel(): string

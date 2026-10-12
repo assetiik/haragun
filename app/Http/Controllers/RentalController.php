@@ -23,6 +23,8 @@ class RentalController extends Controller
         $date = $validated['date'] ?? now()->toDateString();
         $time = $validated['time'] ?? '16:00';
 
+        $request->attributes->set('booking_date', $date);
+
         $rentals = $establishment->products()
             ->rentals()
             ->active()

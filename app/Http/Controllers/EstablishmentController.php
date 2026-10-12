@@ -52,6 +52,7 @@ class EstablishmentController extends Controller
             $dates = $this->booking->dates($establishment);
             $selectedDate = $this->booking->resolveDate($establishment, $validated['date'] ?? null);
             $slots = $this->booking->slots($establishment, $selectedDate);
+            $request->attributes->set('booking_date', $selectedDate);
         }
 
         $products = collect();

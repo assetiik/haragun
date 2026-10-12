@@ -24,11 +24,13 @@ class RentalProductResource extends JsonResource
             ])->values()->all()
             : [];
 
+        $bookingDate = $request->attributes->get('booking_date');
+
         return [
             'id' => $this->id,
             'kind' => $this->kind->value,
             'name' => $this->name,
-            'price' => $this->price,
+            'price' => $this->priceOn(is_string($bookingDate) ? $bookingDate : null),
             'meta' => $this->meta,
             'requires_size' => $this->requires_size,
             'size_min' => $this->size_min,

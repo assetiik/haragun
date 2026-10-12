@@ -74,6 +74,41 @@ class RentalAndQuoteTest extends TestCase
             ->assertJsonPath('session.time', '16:00');
     }
 
+    public function test_rental_and_quote_prices_follow_the_weekend(): void
+    {
+        [$arena, $skates, $helmet, $adult] = $this->seedArenaCatalog();
+
+        $adult->update(['price' => 4000, 'weekend_price' => 6000]);
+        $skates->update(['weekend_price' => 3500]);
+        $helmet->update(['weekend_price' => 1500]);
+
+        $this->getJson("/api/establishments/{$arena->id}/rentals?date=2026-02-13&time=10:00")
+            ->assertOk()
+            ->assertJsonPath('rentals.0.price', 2500)
+            ->assertJsonPath('rentals.1.price', 2500);
+
+        $this->getJson("/api/establishments/{$arena->id}/rentals?date=2026-02-14&time=10:00")
+            ->assertOk()
+            ->assertJsonPath('rentals.0.price', 3500)
+            ->assertJsonPath('rentals.1.price', 1500);
+
+        $this->postJson('/api/orders/quote', [
+            'establishment_id' => $arena->id,
+            'date' => '2026-02-14',
+            'time' => '10:00',
+            'items' => [
+                ['product_id' => $adult->id, 'quantity' => 1],
+                ['product_id' => $skates->id, 'sizes' => [38]],
+                ['product_id' => $helmet->id, 'quantity' => 1],
+            ],
+        ])
+            ->assertOk()
+            ->assertJsonPath('lines.0.unit_price', 6000)
+            ->assertJsonPath('lines.1.unit_price', 3500)
+            ->assertJsonPath('lines.2.unit_price', 1500)
+            ->assertJsonPath('total', 11000);
+    }
+
     public function test_quote_rejects_unavailable_skate_size(): void
     {
         [$arena, $skates] = $this->seedArenaCatalog();

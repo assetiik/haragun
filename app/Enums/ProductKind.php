@@ -13,4 +13,9 @@ enum ProductKind: string
     {
         return in_array($this, [self::RentalSkates, self::RentalHelmet], true);
     }
+
+    public function chargesByDay(): bool
+    {
+        return $this !== self::Food;
+    }
 }

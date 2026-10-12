@@ -6,6 +6,7 @@ use App\Enums\EstablishmentType;
 use App\Filament\Support\LocalizedFields;
 use App\Filament\Support\VenueSection;
 use App\Models\Establishment;
+use App\Models\MenuCategory;
 use App\Models\Modifier;
 use App\Models\Product;
 use Filament\Forms\Components\FileUpload;
@@ -111,6 +112,7 @@ class ProductForm
                             )
                             ->native(false)
                             ->preload()
+                            ->live()
                             ->required()
                             ->columnSpan([
                                 'md' => 6,
@@ -122,7 +124,7 @@ class ProductForm
                             ->hidden()
                             ->dehydrated(false),
                         TextInput::make('price')
-                            ->label('Цена')
+                            ->label(fn ($livewire, Get $get): string => self::usesDayPrice($livewire, $get) ? 'Цена в будни' : 'Цена')
                             ->required(fn ($livewire): bool => ! self::isCoffeeForm($livewire))
                             ->dehydrated(fn ($livewire): bool => ! self::isCoffeeForm($livewire))
                             ->visible(fn ($livewire): bool => ! self::isCoffeeForm($livewire))
@@ -130,7 +132,22 @@ class ProductForm
                             ->integer()
                             ->minValue(0)
                             ->suffix('₸')
-                            ->helperText('Целое число в тенге')
+                            ->helperText(fn ($livewire, Get $get): string => self::usesDayPrice($livewire, $get)
+                                ? 'Понедельник — пятница'
+                                : 'Целое число в тенге')
+                            ->columnSpan([
+                                'md' => 6,
+                            ]),
+                        TextInput::make('weekend_price')
+                            ->label('Цена в выходные')
+                            ->required(fn ($livewire, Get $get): bool => self::usesDayPrice($livewire, $get))
+                            ->visible(fn ($livewire, Get $get): bool => self::usesDayPrice($livewire, $get))
+                            ->dehydrated(fn ($livewire, Get $get): bool => self::usesDayPrice($livewire, $get))
+                            ->numeric()
+                            ->integer()
+                            ->minValue(0)
+                            ->suffix('₸')
+                            ->helperText('Суббота и воскресенье')
                             ->columnSpan([
                                 'md' => 6,
                             ]),
@@ -403,5 +420,34 @@ class ProductForm
             $livewire->record ?? null,
             $livewire->venueTab ?? null,
         );
+    }
+
+    private static function usesDayPrice(object $livewire, Get $get): bool
+    {
+        if (self::isCoffeeForm($livewire)) {
+            return false;
+        }
+
+        if (self::isSkateForm($livewire)) {
+            return true;
+        }
+
+        $record = $livewire->record ?? null;
+
+        if ($record instanceof Product) {
+            return $record->kind->chargesByDay();
+        }
+
+        $categoryId = $get('menu_category_id');
+
+        if (filled($categoryId)) {
+            $category = MenuCategory::query()->find($categoryId);
+
+            if ($category !== null) {
+                return ! $category->isFoodCourt();
+            }
+        }
+
+        return ($livewire->venueTab ?? VenueSection::fromRequest()) === VenueSection::Haragun;
     }
 }

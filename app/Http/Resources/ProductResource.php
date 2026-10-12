@@ -16,11 +16,13 @@ class ProductResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $bookingDate = $request->attributes->get('booking_date');
+
         return [
             'id' => $this->id,
             'kind' => $this->kind->value,
             'name' => $this->name,
-            'price' => $this->price,
+            'price' => $this->priceOn(is_string($bookingDate) ? $bookingDate : null),
             'meta' => $this->meta,
             'age_from' => $this->age_from,
         ];

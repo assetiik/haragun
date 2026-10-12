@@ -62,7 +62,15 @@ class ProductsTable
                     ->toggleable(),
                 TextColumn::make('price')
                     ->label('Цена')
-                    ->formatStateUsing(fn (int $state): string => Money::format($state))
+                    ->formatStateUsing(function (Product $record): string {
+                        if (! $record->kind->chargesByDay()) {
+                            return Money::format($record->price);
+                        }
+
+                        $weekend = $record->weekend_price ?? $record->price;
+
+                        return Money::format($record->price).' / '.Money::format($weekend);
+                    })
                     ->sortable(),
                 IconColumn::make('is_active')
                     ->label('Активен')
