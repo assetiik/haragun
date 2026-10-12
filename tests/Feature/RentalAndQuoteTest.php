@@ -9,6 +9,7 @@ use App\Models\Establishment;
 use App\Models\MenuCategory;
 use App\Models\Product;
 use App\Models\SkateSize;
+use App\Support\IceRentalCatalog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Tests\TestCase;
@@ -37,6 +38,54 @@ class RentalAndQuoteTest extends TestCase
         $sizes = collect($response->json('rentals.0.sizes'));
         $this->assertTrue($sizes->contains(fn (array $size) => $size['size'] === 38 && $size['is_available'] === true));
         $this->assertTrue($sizes->contains(fn (array $size) => $size['size'] === 46 && $size['is_available'] === false));
+    }
+
+    public function test_rentals_endpoint_returns_child_skates_adult_skates_helmet_and_support(): void
+    {
+        $arena = Establishment::factory()->create([
+            'type' => EstablishmentType::IceArena,
+        ]);
+        $category = MenuCategory::factory()->create([
+            'establishment_id' => $arena->id,
+            'slug' => 'ice_rental',
+            'requires_booking' => true,
+        ]);
+        Product::factory()->create([
+            'establishment_id' => $arena->id,
+            'menu_category_id' => $category->id,
+            'kind' => ProductKind::RentalSkates,
+            'name' => 'Коньки',
+            'price' => 2500,
+            'requires_size' => true,
+        ]);
+
+        IceRentalCatalog::sync($category);
+
+        $this->getJson("/api/establishments/{$arena->id}/rentals?date=2026-10-16&time=10:00")
+            ->assertOk()
+            ->assertJsonCount(4, 'rentals')
+            ->assertJsonPath('rentals.0.name', 'Детские коньки (бренд GRAF)')
+            ->assertJsonPath('rentals.0.kind', 'rental_skates')
+            ->assertJsonPath('rentals.0.price', 2000)
+            ->assertJsonPath('rentals.0.meta', '1 сеанс')
+            ->assertJsonPath('rentals.0.size_min', 25)
+            ->assertJsonPath('rentals.0.size_max', 35)
+            ->assertJsonPath('rentals.0.selection_mode', 'sizes')
+            ->assertJsonPath('rentals.0.sizes.0.size', 25)
+            ->assertJsonPath('rentals.1.name', 'Взрослые коньки')
+            ->assertJsonPath('rentals.1.price', 3000)
+            ->assertJsonPath('rentals.1.size_min', 36)
+            ->assertJsonPath('rentals.1.size_max', 47)
+            ->assertJsonPath('rentals.1.sizes.11.size', 47)
+            ->assertJsonPath('rentals.2.name', 'Шлем / защита')
+            ->assertJsonPath('rentals.2.kind', 'rental_helmet')
+            ->assertJsonPath('rentals.2.price', 1500)
+            ->assertJsonPath('rentals.2.selection_mode', 'quantity')
+            ->assertJsonPath('rentals.3.kind', 'rental_support')
+            ->assertJsonPath('rentals.3.price', 2000)
+            ->assertJsonPath('rentals.3.selection_mode', 'quantity')
+            ->assertJsonPath('rentals.3.requires_size', false)
+            ->assertJsonPath('rentals.3.sizes', []);
     }
 
     public function test_quote_calculates_tickets_rentals_and_weekday_discount(): void

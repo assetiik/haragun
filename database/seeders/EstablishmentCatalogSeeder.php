@@ -8,7 +8,7 @@ use App\Models\Establishment;
 use App\Models\EstablishmentUnavailableSlot;
 use App\Models\MenuCategory;
 use App\Models\Product;
-use App\Models\SkateSize;
+use App\Support\IceRentalCatalog;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
 
@@ -111,51 +111,7 @@ class EstablishmentCatalogSeeder extends Seeder
             ],
         );
 
-        $skates = Product::query()->updateOrCreate(
-            [
-                'establishment_id' => $arena->id,
-                'menu_category_id' => $ice->id,
-                'name' => 'Коньки',
-            ],
-            [
-                'kind' => ProductKind::RentalSkates,
-                'requires_size' => true,
-                'size_min' => 35,
-                'size_max' => 46,
-                'price' => 2500,
-                'meta' => 'за пару',
-                'is_active' => true,
-                'sort_order' => 10,
-            ],
-        );
-
-        foreach (range(35, 46) as $size) {
-            SkateSize::query()->updateOrCreate(
-                [
-                    'product_id' => $skates->id,
-                    'size' => $size,
-                ],
-                [
-                    'is_available' => $size !== 46,
-                ],
-            );
-        }
-
-        Product::query()->updateOrCreate(
-            [
-                'establishment_id' => $arena->id,
-                'menu_category_id' => $ice->id,
-                'name' => 'Шлем',
-            ],
-            [
-                'kind' => ProductKind::RentalHelmet,
-                'requires_size' => false,
-                'price' => 2500,
-                'meta' => 'универсальный размер',
-                'is_active' => true,
-                'sort_order' => 11,
-            ],
-        );
+        IceRentalCatalog::sync($ice);
 
         $foodItems = [
             [

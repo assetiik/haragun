@@ -85,6 +85,14 @@ class OrderListResource extends JsonResource
             ];
         }
 
+        foreach ($this->items->where('kind', ProductKind::RentalSupport->value) as $item) {
+            $items[] = [
+                'kind' => ProductKind::RentalSupport->value,
+                'quantity' => $item->quantity,
+                'icon_key' => 'support',
+            ];
+        }
+
         return $items;
     }
 }

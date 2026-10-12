@@ -133,10 +133,7 @@ class Product extends Model
     #[Scope]
     protected function rentals(Builder $query): void
     {
-        $query->whereIn('kind', [
-            ProductKind::RentalSkates,
-            ProductKind::RentalHelmet,
-        ]);
+        $query->whereIn('kind', ProductKind::rentalValues());
     }
 
     #[Scope]

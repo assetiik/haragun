@@ -188,8 +188,7 @@ class OrderQuoteService
         $ticketsAndRentals = $lines
             ->filter(fn (array $line) => in_array($line['kind'], [
                 ProductKind::Ticket->value,
-                ProductKind::RentalSkates->value,
-                ProductKind::RentalHelmet->value,
+                ...ProductKind::rentalValues(),
             ], true))
             ->sum(fn (array $line) => $line['amount']);
 

@@ -91,8 +91,7 @@ class OrderService
         foreach ($lines as $line) {
             if (in_array($line['kind'], [
                 ProductKind::Ticket->value,
-                ProductKind::RentalSkates->value,
-                ProductKind::RentalHelmet->value,
+                ...ProductKind::rentalValues(),
             ], true)) {
                 return OrderType::Tickets;
             }
@@ -154,9 +153,10 @@ class OrderService
         $tickets = $productLines->where('kind', ProductKind::Ticket->value)->sum('quantity');
         $skates = $productLines->where('kind', ProductKind::RentalSkates->value)->sum('quantity');
         $helmets = $productLines->where('kind', ProductKind::RentalHelmet->value)->sum('quantity');
+        $supports = $productLines->where('kind', ProductKind::RentalSupport->value)->sum('quantity');
         $food = $productLines->where('kind', ProductKind::Food->value)->sum('quantity');
 
-        if ($tickets > 0 || $skates > 0 || $helmets > 0) {
+        if ($tickets > 0 || $skates > 0 || $helmets > 0 || $supports > 0) {
             $parts = [];
             if ($tickets > 0) {
                 $parts[] = $tickets.' '.$this->plural($tickets, 'билет', 'билета', 'билетов');
@@ -166,6 +166,9 @@ class OrderService
             }
             if ($helmets > 0) {
                 $parts[] = 'шлем';
+            }
+            if ($supports > 0) {
+                $parts[] = 'помогайка';
             }
 
             return implode(', ', $parts);
@@ -197,6 +200,10 @@ class OrderService
             return 'Универсальный размер';
         }
 
+        if ($line['kind'] === ProductKind::RentalSupport->value) {
+            return '1 сеанс';
+        }
+
         return null;
     }
 
@@ -206,6 +213,7 @@ class OrderService
             ProductKind::Ticket->value => 'ticket',
             ProductKind::RentalSkates->value => 'skates',
             ProductKind::RentalHelmet->value => 'helmet',
+            ProductKind::RentalSupport->value => 'support',
             ProductKind::Food->value => Str::slug($name),
             default => null,
         };

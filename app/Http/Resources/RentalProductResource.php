@@ -32,6 +32,7 @@ class RentalProductResource extends JsonResource
             'name' => $this->name,
             'price' => $this->priceOn(is_string($bookingDate) ? $bookingDate : null),
             'meta' => $this->meta,
+            'description' => $this->description,
             'requires_size' => $this->requires_size,
             'size_min' => $this->size_min,
             'size_max' => $this->size_max,
