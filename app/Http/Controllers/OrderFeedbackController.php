@@ -80,25 +80,6 @@ class OrderFeedbackController extends Controller
         ], 201);
     }
 
-    public function markReady(Request $request, Order $order): JsonResponse
-    {
-        $this->authorizeOwner($request, $order);
-        abort_unless($order->type === OrderType::Venue, 404);
-
-        $order->update([
-            'status' => OrderStatus::Ready,
-            'preparing_at' => $order->preparing_at ?? now(),
-            'ready_at' => now(),
-        ]);
-
-        $order->load(['items.product', 'feedback', 'establishment']);
-
-        return response()->json([
-            'order' => new OrderDetailResource($order),
-            'coffee_screen' => new OrderCoffeeScreenResource($order),
-        ]);
-    }
-
     private function authorizeOwner(Request $request, Order $order): void
     {
         abort_unless($order->user_id === $request->user()->id, 404);

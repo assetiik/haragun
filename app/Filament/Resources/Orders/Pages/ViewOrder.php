@@ -40,13 +40,9 @@ class ViewOrder extends ViewRecord
                 ], true))
                 ->requiresConfirmation()
                 ->action(function (): void {
-                    $this->record->update([
-                        'status' => OrderStatus::Ready,
-                        'preparing_at' => $this->record->preparing_at ?? now(),
-                        'ready_at' => now(),
-                    ]);
+                    $this->record->markReady();
 
-                    Notification::make()->title('Заказ готов')->success()->send();
+                    Notification::make()->title('Клиенту отправлено: заказ готов')->success()->send();
                 }),
             Action::make('markCompleted')
                 ->label('Выдан')

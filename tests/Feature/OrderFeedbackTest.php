@@ -53,11 +53,11 @@ class OrderFeedbackTest extends TestCase
     public function test_ready_screen_allows_optional_comment_feedback(): void
     {
         [$user, $establishment] = $this->seedCoffee();
-        $order = $this->makeVenueOrder($user, $establishment, OrderStatus::Accepted);
+        $order = $this->makeVenueOrder($user, $establishment, OrderStatus::Ready);
 
         Sanctum::actingAs($user);
 
-        $this->postJson("/api/orders/{$order->id}/mark-ready")
+        $this->getJson("/api/orders/{$order->id}/coffee-screen")
             ->assertOk()
             ->assertJsonPath('coffee_screen.screen', 'ready')
             ->assertJsonPath('coffee_screen.feedback.enabled', true)

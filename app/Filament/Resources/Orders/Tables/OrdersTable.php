@@ -4,12 +4,15 @@ namespace App\Filament\Resources\Orders\Tables;
 
 use App\Enums\OrderStatus;
 use App\Enums\OrderType;
+use App\Models\Order;
 use App\Support\Money;
+use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
+use Filament\Notifications\Notification;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
@@ -96,6 +99,22 @@ class OrdersTable
                     ]),
             ])
             ->recordActions([
+                Action::make('markReady')
+                    ->label('Заказ готов')
+                    ->icon('heroicon-o-bell-alert')
+                    ->color('success')
+                    ->visible(fn (Order $record): bool => $record->type === OrderType::Venue && in_array($record->status, [
+                        OrderStatus::Accepted,
+                        OrderStatus::Preparing,
+                    ], true))
+                    ->requiresConfirmation()
+                    ->modalHeading('Отправить клиенту, что заказ готов?')
+                    ->modalSubmitActionLabel('Отправить')
+                    ->action(function (Order $record): void {
+                        $record->markReady();
+
+                        Notification::make()->title('Клиенту отправлено: заказ готов')->success()->send();
+                    }),
                 ViewAction::make()->label('Открыть'),
                 EditAction::make()->label('Изменить'),
                 DeleteAction::make()->label('Удалить'),

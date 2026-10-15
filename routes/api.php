@@ -98,6 +98,4 @@ Route::middleware('auth:sanctum')->group(function () {
         ->name('api.orders.coffee-screen');
     Route::post('/orders/{order}/feedback', [OrderFeedbackController::class, 'store'])
         ->name('api.orders.feedback');
-    Route::post('/orders/{order}/mark-ready', [OrderFeedbackController::class, 'markReady'])
-        ->name('api.orders.mark-ready');
 });

@@ -35,7 +35,7 @@ class ProfileController extends Controller
     public function update(UpdateProfileRequest $request): JsonResponse
     {
         $user = $request->user();
-        $user->update($request->safe()->only(['name', 'notifications_enabled']));
+        $user->update($request->safe()->only(['name', 'notifications_enabled', 'fcm_token']));
 
         $recentOrders = Order::query()
             ->with(['establishment', 'items.product'])

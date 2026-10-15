@@ -19,6 +19,7 @@ class UpdateProfileRequest extends FormRequest
         return [
             'name' => ['sometimes', 'required', 'string', 'max:50'],
             'notifications_enabled' => ['sometimes', 'boolean'],
+            'fcm_token' => ['sometimes', 'nullable', 'string', 'max:4096'],
         ];
     }
 
@@ -31,6 +32,7 @@ class UpdateProfileRequest extends FormRequest
             'name.required' => 'Укажите имя.',
             'name.max' => 'Имя не должно быть длиннее 50 символов.',
             'notifications_enabled.boolean' => 'Уведомления должны быть true или false.',
+            'fcm_token.max' => 'Токен уведомлений слишком длинный.',
         ];
     }
 }

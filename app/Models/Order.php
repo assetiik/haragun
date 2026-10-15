@@ -102,6 +102,19 @@ class Order extends Model
         return 'Гость '.($this->guest_number ?? $this->number);
     }
 
+    public function markReady(): void
+    {
+        if ($this->type !== OrderType::Venue || $this->status === OrderStatus::Ready) {
+            return;
+        }
+
+        $this->update([
+            'status' => OrderStatus::Ready,
+            'preparing_at' => $this->preparing_at ?? now(),
+            'ready_at' => now(),
+        ]);
+    }
+
     public function hasFeedback(): bool
     {
         return $this->relationLoaded('feedback')

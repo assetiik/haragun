@@ -2,11 +2,15 @@
 
 namespace App\Observers;
 
+use App\Enums\OrderStatus;
 use App\Models\Order;
 use App\Models\UserNotification;
+use App\Services\OrderReadyPush;
 
 class OrderObserver
 {
+    public function __construct(private OrderReadyPush $push) {}
+
     public function created(Order $order): void
     {
         $this->recordStatus($order);
@@ -19,6 +23,10 @@ class OrderObserver
         }
 
         $this->recordStatus($order);
+
+        if ($order->status === OrderStatus::Ready) {
+            $this->push->send($order);
+        }
     }
 
     private function recordStatus(Order $order): void
