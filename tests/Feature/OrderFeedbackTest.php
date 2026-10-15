@@ -39,6 +39,7 @@ class OrderFeedbackTest extends TestCase
 
         $response
             ->assertCreated()
+            ->assertJsonPath('order.status', 'accepted')
             ->assertJsonPath('coffee_screen.screen', 'accepted')
             ->assertJsonPath('coffee_screen.guest_number', $user->guestNumber())
             ->assertJsonPath('coffee_screen.primary_action', 'dismiss')

@@ -38,7 +38,7 @@ class OrderService
                 'user_id' => $user->id,
                 'establishment_id' => $payload['establishment_id'],
                 'type' => $type,
-                'status' => $type === OrderType::Tickets ? OrderStatus::Confirmed : OrderStatus::Preparing,
+                'status' => $type === OrderType::Tickets ? OrderStatus::Confirmed : OrderStatus::Accepted,
                 'number' => $number,
                 'code' => 'HRG-'.$number,
                 'session_date' => $payload['date'],
@@ -55,7 +55,7 @@ class OrderService
                 'prep_minutes' => $type === OrderType::Venue ? 5 : null,
                 'paid_at' => $now,
                 'accepted_at' => $now,
-                'preparing_at' => $type === OrderType::Venue ? $now->copy()->addSeconds(30) : null,
+                'preparing_at' => null,
                 'ready_at' => null,
                 'completed_at' => null,
             ]);

@@ -8,6 +8,7 @@ use App\Models\Order;
 use App\Models\User;
 use App\Models\UserNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Laravel\Sanctum\Sanctum;
@@ -16,6 +17,27 @@ use Tests\TestCase;
 class OrderReadyPushTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_accepted_coffee_order_becomes_preparing_after_a_few_seconds(): void
+    {
+        Carbon::setTestNow('2026-10-15 12:00:00');
+
+        $order = Order::factory()->create([
+            'type' => OrderType::Venue,
+            'status' => OrderStatus::Accepted,
+            'accepted_at' => now(),
+            'preparing_at' => null,
+        ]);
+
+        $this->assertSame(OrderStatus::Accepted, Order::query()->find($order->id)->status);
+
+        Carbon::setTestNow(now()->addSeconds(Order::PREPARING_AFTER_SECONDS + 1));
+
+        $promoted = Order::query()->find($order->id);
+
+        $this->assertSame(OrderStatus::Preparing, $promoted->status);
+        $this->assertNotNull($promoted->preparing_at);
+    }
 
     public function test_client_cannot_mark_an_order_ready(): void
     {

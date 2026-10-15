@@ -176,7 +176,7 @@ class CartService
                 'prep_minutes' => 15,
                 'paid_at' => $now,
                 'accepted_at' => $now,
-                'preparing_at' => $now,
+                'preparing_at' => null,
                 'ready_at' => null,
                 'completed_at' => null,
             ]);

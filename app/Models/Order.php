@@ -52,6 +52,22 @@ class Order extends Model
     /** @use HasFactory<OrderFactory> */
     use HasFactory;
 
+    protected static function booted(): void
+    {
+        static::retrieved(function (Order $order): void {
+            $order->promoteToPreparingIfDue();
+        });
+
+        static::updating(function (Order $order): void {
+            if (! $order->isDirty('status') || $order->status !== OrderStatus::Ready) {
+                return;
+            }
+
+            $order->ready_at ??= now();
+            $order->preparing_at ??= now();
+        });
+    }
+
     /**
      * @return array<string, string>
      */
@@ -100,6 +116,26 @@ class Order extends Model
     public function guestLabel(): string
     {
         return 'Гость '.($this->guest_number ?? $this->number);
+    }
+
+    public const PREPARING_AFTER_SECONDS = 3;
+
+    public function promoteToPreparingIfDue(): void
+    {
+        if ($this->type !== OrderType::Venue || $this->status !== OrderStatus::Accepted) {
+            return;
+        }
+
+        $acceptedAt = $this->accepted_at ?? $this->created_at;
+
+        if ($acceptedAt === null || $acceptedAt->gt(now()->subSeconds(self::PREPARING_AFTER_SECONDS))) {
+            return;
+        }
+
+        $this->update([
+            'status' => OrderStatus::Preparing,
+            'preparing_at' => now(),
+        ]);
     }
 
     public function markReady(): void

@@ -3,6 +3,8 @@
 namespace App\Filament\Resources\Orders\Schemas;
 
 use App\Enums\OrderStatus;
+use App\Enums\OrderType;
+use App\Models\Order;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Section;
@@ -21,16 +23,26 @@ class OrderForm
                     ->schema([
                         Select::make('status')
                             ->label('Статус')
-                            ->options(collect(OrderStatus::cases())->mapWithKeys(
-                                fn (OrderStatus $status): array => [$status->value => match ($status) {
-                                    OrderStatus::Accepted => 'Принят',
-                                    OrderStatus::Preparing => 'Готовится',
-                                    OrderStatus::Ready => 'Готов',
-                                    OrderStatus::Confirmed => 'Подтверждён',
-                                    OrderStatus::Completed => 'Завершён',
-                                    OrderStatus::Cancelled => 'Отменён',
-                                }]
-                            )->all())
+                            ->options(function (?Order $record): array {
+                                $statuses = $record?->type === OrderType::Tickets
+                                    ? [OrderStatus::Confirmed, OrderStatus::Cancelled]
+                                    : [OrderStatus::Accepted, OrderStatus::Preparing, OrderStatus::Ready];
+
+                                if ($record !== null && ! in_array($record->status, $statuses, true)) {
+                                    $statuses[] = $record->status;
+                                }
+
+                                return collect($statuses)->mapWithKeys(
+                                    fn (OrderStatus $status): array => [$status->value => match ($status) {
+                                        OrderStatus::Accepted => 'Принят',
+                                        OrderStatus::Preparing => 'Готовится',
+                                        OrderStatus::Ready => 'Готов',
+                                        OrderStatus::Confirmed => 'Подтверждён',
+                                        OrderStatus::Completed => 'Завершён',
+                                        OrderStatus::Cancelled => 'Отменён',
+                                    }]
+                                )->all();
+                            })
                             ->required()
                             ->native(false)
                             ->columnSpan([

@@ -115,9 +115,9 @@ class OrdersTable
 
                         Notification::make()->title('Клиенту отправлено: заказ готов')->success()->send();
                     }),
-                ViewAction::make()->label('Открыть'),
-                EditAction::make()->label('Изменить'),
-                DeleteAction::make()->label('Удалить'),
+                ViewAction::make()->label('Открыть')->iconButton(),
+                EditAction::make()->label('Изменить')->iconButton(),
+                DeleteAction::make()->label('Удалить')->iconButton(),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
