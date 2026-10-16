@@ -2,8 +2,10 @@
 
 namespace App\Filament\Resources\MenuCategories\Pages;
 
+use App\Enums\MenuCatalog;
 use App\Filament\Concerns\FillsVenueTypeFromRequest;
 use App\Filament\Resources\MenuCategories\MenuCategoryResource;
+use App\Filament\Support\VenueSection;
 use Filament\Resources\Pages\CreateRecord;
 
 class CreateMenuCategory extends CreateRecord
@@ -22,7 +24,8 @@ class CreateMenuCategory extends CreateRecord
     {
         $data = $this->fillVenueTypeBeforeCreate($data);
 
-        if (filled($data['catalog'] ?? null)) {
+        if (VenueSection::isFoodCategoryContext(tab: $this->venueTab)) {
+            $data['catalog'] = MenuCatalog::Drinks->value;
             $data['establishment_id'] = null;
             $data['requires_booking'] = false;
             $data['slug'] = null;

@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\Products\Schemas;
 
 use App\Enums\EstablishmentType;
-use App\Enums\MenuCatalog;
 use App\Filament\Support\LocalizedFields;
 use App\Filament\Support\VenueSection;
 use App\Models\Establishment;
@@ -134,17 +133,10 @@ class ProductForm
                         Select::make('kind')
                             ->hidden()
                             ->dehydrated(false),
-                        Select::make('food_section')
-                            ->label('Категория перекуса')
-                            ->options(fn (): array => MenuCategory::query()
-                                ->where('catalog', MenuCatalog::Snacks)
-                                ->active()
-                                ->ordered()
-                                ->pluck('name', 'name')
-                                ->all())
-                            ->native(false)
-                            ->searchable()
-                            ->helperText('Список берётся из Haragun → Категории, раздел «Перекус».')
+                        TextInput::make('food_section')
+                            ->label('Секция')
+                            ->maxLength(120)
+                            ->helperText('Например: Перекус или Напитки')
                             ->visible(fn ($livewire, Get $get): bool => ! self::isCoffeeForm($livewire) && self::categoryIsFoodCourt($get('menu_category_id')))
                             ->dehydrated(fn ($livewire, Get $get): bool => ! self::isCoffeeForm($livewire) && self::categoryIsFoodCourt($get('menu_category_id')))
                             ->columnSpan([

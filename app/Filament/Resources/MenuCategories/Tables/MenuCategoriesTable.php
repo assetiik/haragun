@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\MenuCategories\Tables;
 
-use App\Enums\MenuCatalog;
 use App\Filament\Support\VenueSection;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
@@ -31,11 +30,6 @@ class MenuCategoriesTable
                         VenueSection::Cafes,
                         VenueSection::HaragunFood,
                     ], true)),
-                TextColumn::make('catalog')
-                    ->label('Раздел')
-                    ->badge()
-                    ->formatStateUsing(fn (?MenuCatalog $state): string => $state?->label() ?? '—')
-                    ->visible(fn (): bool => VenueSection::fromRequest() === VenueSection::HaragunFood),
                 TextColumn::make('slug')
                     ->label('Тип')
                     ->badge()
