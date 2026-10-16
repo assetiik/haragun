@@ -66,6 +66,13 @@ class CoffeeMenuController extends Controller
 
         if ($selectedSlug === 'popular') {
             $productsQuery->popular();
+        } elseif ($establishment->type === EstablishmentType::IceArena) {
+            // Haragun chips are drink-catalog categories; products may still
+            // reference legacy coffee categories that share the same slug.
+            $productsQuery->whereHas(
+                'menuCategory',
+                fn ($categoryQuery) => $categoryQuery->where('slug', $selectedSlug),
+            );
         } else {
             $category = $categories->firstWhere('slug', $selectedSlug);
             $productsQuery->where('menu_category_id', $category?->id);

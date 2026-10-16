@@ -25,6 +25,7 @@ use App\Filament\Resources\Modifiers\Pages\CreateModifier;
 use App\Filament\Resources\OrderFeedback\OrderFeedbackResource;
 use App\Filament\Resources\Orders\OrderResource;
 use App\Filament\Resources\Products\Pages\CreateProduct;
+use App\Filament\Resources\Products\Pages\EditProduct;
 use App\Filament\Resources\Products\Pages\ListProducts;
 use App\Filament\Resources\Users\UserResource;
 use App\Models\Admin;
@@ -531,6 +532,53 @@ class AdminPanelTest extends TestCase
         $this->assertSame([300, 400, 500], $sizes->pluck('volume_ml')->values()->all());
         $this->assertTrue((bool) $sizes->firstWhere('code', 'M')['is_default']);
         $this->assertSame('400 мл', $sizes->firstWhere('code', 'M')['label']);
+    }
+
+    public function test_editing_a_haragun_drink_hides_duplicate_cafe_and_arena_categories(): void
+    {
+        $admin = Admin::factory()->create();
+        $brand = Brand::factory()->create([
+            'type' => EstablishmentType::IceArena,
+        ]);
+        $arena = Establishment::factory()->create([
+            'type' => EstablishmentType::IceArena,
+            'brand_id' => $brand->id,
+        ]);
+        $ice = MenuCategory::factory()->create([
+            'establishment_id' => $arena->id,
+            'type' => EstablishmentType::IceArena,
+            'slug' => 'ice_rental',
+            'name' => 'Лёд и аренда',
+        ]);
+        MenuCategory::factory()->create([
+            'establishment_id' => null,
+            'type' => EstablishmentType::Coffee,
+            'slug' => 'coffee',
+            'name' => 'Кофе',
+        ]);
+        $drinkCategory = MenuCategory::factory()->create([
+            'establishment_id' => null,
+            'type' => EstablishmentType::IceArena,
+            'catalog' => MenuCatalog::Drinks,
+            'slug' => 'goriacie-napitki',
+            'name' => 'Горячие напитки',
+        ]);
+        $product = Product::factory()->create([
+            'brand_id' => $brand->id,
+            'establishment_id' => null,
+            'menu_category_id' => $drinkCategory->id,
+            'kind' => ProductKind::Food,
+            'name' => 'Латте Unique',
+        ]);
+
+        $this->actingAs($admin, 'admin');
+
+        Livewire::test(EditProduct::class, ['record' => $product->getKey()])
+            ->assertSee('Горячие напитки')
+            ->assertDontSee('Лёд и аренда')
+            ->assertFormSet(['menu_category_id' => $drinkCategory->id]);
+
+        $this->assertDatabaseHas('menu_categories', ['id' => $ice->id]);
     }
 
     public function test_creating_a_haragun_cafe_drink_uses_the_arena_drink_category(): void

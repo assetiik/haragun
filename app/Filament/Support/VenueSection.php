@@ -220,7 +220,8 @@ final class VenueSection
      */
     public static function constrainMenuCategories(Builder $query): Builder
     {
-        $section = self::fromRequest();
+        $section = self::fromRequest()
+            ?? self::fromRecord(data_get(Livewire::current(), 'record'));
 
         if ($section === self::Cafes) {
             return $query->where('type', EstablishmentType::Coffee);

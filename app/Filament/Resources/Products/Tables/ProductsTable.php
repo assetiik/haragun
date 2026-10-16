@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Products\Tables;
 
+use App\Filament\Resources\Products\ProductResource;
+use App\Filament\Support\VenueSection;
 use App\Models\Product;
 use App\Support\Money;
 use Filament\Actions\BulkActionGroup;
@@ -84,7 +86,12 @@ class ProductsTable
                 TernaryFilter::make('is_active')->label('Активные'),
             ])
             ->recordActions([
-                EditAction::make()->label('Изменить'),
+                EditAction::make()
+                    ->label('Изменить')
+                    ->url(fn (Product $record): string => VenueSection::withTab(
+                        ProductResource::getUrl('edit', ['record' => $record]),
+                        VenueSection::fromRequest() ?? VenueSection::fromRecord($record),
+                    )),
                 DeleteAction::make()->label('Удалить'),
             ])
             ->toolbarActions([

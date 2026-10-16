@@ -210,6 +210,62 @@ class CoffeeMenuTest extends TestCase
         $this->assertNotContains('Хот-дог', collect($response->json('products'))->pluck('name')->all());
     }
 
+    public function test_ice_arena_menu_lists_products_when_chip_and_legacy_category_share_a_slug(): void
+    {
+        [$arena] = $this->seedCoffeeMenu(EstablishmentType::IceArena);
+        $legacyTea = MenuCategory::query()->where('slug', 'tea')->where('type', EstablishmentType::Coffee)->firstOrFail();
+        MenuCategory::factory()->create([
+            'establishment_id' => null,
+            'type' => EstablishmentType::IceArena,
+            'catalog' => MenuCatalog::Drinks,
+            'name' => 'Чай',
+            'slug' => 'tea',
+            'sort_order' => 1,
+        ]);
+        Product::factory()->create([
+            'brand_id' => $arena->brand_id,
+            'establishment_id' => null,
+            'menu_category_id' => $legacyTea->id,
+            'kind' => ProductKind::Food,
+            'name' => 'Улун с земляникой',
+            'price' => 2000,
+            'is_active' => true,
+            'is_popular' => false,
+            'sort_order' => 5,
+        ]);
+
+        $names = collect($this->getJson("/api/establishments/{$arena->id}/menu?category=tea")
+            ->assertOk()
+            ->assertJsonPath('selected_category', 'tea')
+            ->json('products'))->pluck('name');
+
+        $this->assertTrue($names->contains('Улун с земляникой'));
+        $this->assertTrue($names->contains('Чай зелёный'));
+        $this->assertFalse($names->contains('Латте'));
+    }
+
+    public function test_remap_moves_arena_drinks_onto_haragun_food_categories(): void
+    {
+        [$arena] = $this->seedCoffeeMenu(EstablishmentType::IceArena);
+        $legacyTea = MenuCategory::query()->where('slug', 'tea')->where('type', EstablishmentType::Coffee)->firstOrFail();
+        $haragunTea = MenuCategory::factory()->create([
+            'establishment_id' => null,
+            'type' => EstablishmentType::IceArena,
+            'catalog' => MenuCatalog::Drinks,
+            'name' => 'Чай',
+            'slug' => 'tea',
+        ]);
+        $drink = Product::query()
+            ->where('brand_id', $arena->brand_id)
+            ->where('menu_category_id', $legacyTea->id)
+            ->firstOrFail();
+
+        $this->artisan('haragun:remap-arena-drink-categories')
+            ->assertSuccessful();
+
+        $this->assertSame($haragunTea->id, $drink->fresh()->menu_category_id);
+    }
+
     public function test_ice_arena_foodcourt_product_show_returns_quantity_mode(): void
     {
         [$arena] = $this->seedCoffeeMenu(EstablishmentType::IceArena);
