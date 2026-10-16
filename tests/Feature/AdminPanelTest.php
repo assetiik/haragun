@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\BannerPlacement;
 use App\Enums\EstablishmentType;
 use App\Enums\FeedbackRating;
+use App\Enums\MenuCatalog;
 use App\Enums\ProductKind;
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Resources\Banners\BannerResource;
@@ -18,6 +19,7 @@ use App\Filament\Resources\Establishments\Pages\CreateEstablishment;
 use App\Filament\Resources\Establishments\Pages\EditEstablishment;
 use App\Filament\Resources\Establishments\Pages\ListEstablishments;
 use App\Filament\Resources\MenuCategories\Pages\CreateMenuCategory;
+use App\Filament\Resources\MenuCategories\Pages\ListMenuCategories;
 use App\Filament\Resources\Modifiers\ModifierResource;
 use App\Filament\Resources\Modifiers\Pages\CreateModifier;
 use App\Filament\Resources\OrderFeedback\OrderFeedbackResource;
@@ -257,7 +259,74 @@ class AdminPanelTest extends TestCase
             'name' => 'Чай',
             'slug' => 'tea',
             'requires_booking' => false,
+            'catalog' => null,
         ]);
+    }
+
+    public function test_haragun_categories_can_be_created_for_drinks_and_snacks(): void
+    {
+        $admin = Admin::factory()->create();
+        $arena = Establishment::factory()->create([
+            'type' => EstablishmentType::IceArena,
+        ]);
+        $ice = MenuCategory::factory()->create([
+            'establishment_id' => $arena->id,
+            'type' => EstablishmentType::IceArena,
+            'slug' => 'ice_rental',
+            'name' => 'Лёд и арена',
+        ]);
+        $coffeeCategory = MenuCategory::factory()->create([
+            'establishment_id' => null,
+            'type' => EstablishmentType::Coffee,
+            'slug' => 'shop-tea',
+            'name' => 'Чай кофейни',
+        ]);
+
+        $this->actingAs($admin, 'admin');
+
+        Livewire::withQueryParams(['tab' => 'haragun'])
+            ->test(CreateMenuCategory::class)
+            ->fillForm([
+                'name' => 'Чай',
+                'sort_order' => 3,
+                'is_active' => true,
+                'catalog' => MenuCatalog::Drinks->value,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        Livewire::withQueryParams(['tab' => 'haragun'])
+            ->test(CreateMenuCategory::class)
+            ->fillForm([
+                'name' => 'Горячее',
+                'sort_order' => 4,
+                'is_active' => true,
+                'catalog' => MenuCatalog::Snacks->value,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $drinkCategory = MenuCategory::query()->where('name', 'Чай')->first();
+        $snackCategory = MenuCategory::query()->where('name', 'Горячее')->first();
+
+        $this->assertNotNull($drinkCategory);
+        $this->assertNotNull($snackCategory);
+        $this->assertSame(EstablishmentType::IceArena, $drinkCategory->type);
+        $this->assertSame(MenuCatalog::Drinks, $drinkCategory->catalog);
+        $this->assertNull($drinkCategory->establishment_id);
+        $this->assertSame('tea', $drinkCategory->slug);
+        $this->assertSame(MenuCatalog::Snacks, $snackCategory->catalog);
+        $this->assertNull($snackCategory->establishment_id);
+
+        Livewire::test(ListMenuCategories::class)
+            ->set('activeTab', 'haragun')
+            ->assertCanSeeTableRecords([$ice, $drinkCategory, $snackCategory])
+            ->assertCanNotSeeTableRecords([$coffeeCategory]);
+
+        Livewire::test(ListMenuCategories::class)
+            ->set('activeTab', 'cafes')
+            ->assertCanSeeTableRecords([$coffeeCategory])
+            ->assertCanNotSeeTableRecords([$ice, $drinkCategory, $snackCategory]);
     }
 
     public function test_creating_a_coffee_drink_hides_extra_fields_and_stores_an_uploaded_photo(): void
@@ -456,16 +525,24 @@ class AdminPanelTest extends TestCase
         $this->assertSame('400 мл', $sizes->firstWhere('code', 'M')['label']);
     }
 
-    public function test_creating_a_haragun_cafe_drink_uses_the_arena_and_a_shared_coffee_category(): void
+    public function test_creating_a_haragun_cafe_drink_uses_the_arena_drink_category(): void
     {
         $admin = Admin::factory()->create();
         $brand = Brand::factory()->create([
             'type' => EstablishmentType::IceArena,
             'name' => 'Ледовая арена Haragun',
         ]);
-        $category = MenuCategory::factory()->create([
+        MenuCategory::factory()->create([
             'establishment_id' => null,
             'type' => EstablishmentType::Coffee,
+            'name' => 'Чай кофейни',
+            'slug' => 'shop-tea',
+            'sort_order' => 1,
+        ]);
+        $category = MenuCategory::factory()->create([
+            'establishment_id' => null,
+            'type' => EstablishmentType::IceArena,
+            'catalog' => MenuCatalog::Drinks,
             'name' => 'Чай',
             'slug' => 'tea',
             'sort_order' => 1,
@@ -475,6 +552,8 @@ class AdminPanelTest extends TestCase
 
         Livewire::withQueryParams(['tab' => 'haragun-cafe'])
             ->test(CreateProduct::class)
+            ->assertSee('Чай')
+            ->assertDontSee('Чай кофейни')
             ->assertFormFieldIsHidden('kind')
             ->assertFormFieldIsHidden('food_section')
             ->assertFormFieldIsHidden('establishment_id')

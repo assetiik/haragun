@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Enums\EstablishmentType;
+use App\Enums\MenuCatalog;
 use App\Enums\ProductKind;
 use App\Models\Brand;
 use App\Models\City;
@@ -141,6 +142,35 @@ class CoffeeMenuTest extends TestCase
             ->assertJsonPath('featured.id', $latte->id)
             ->assertJsonPath('featured.name', 'Латте')
             ->assertJsonPath('categories.2.slug', 'coffee');
+    }
+
+    public function test_ice_arena_menu_includes_haragun_drink_categories_and_coffee_shops_do_not(): void
+    {
+        [$arena] = $this->seedCoffeeMenu(EstablishmentType::IceArena);
+        MenuCategory::factory()->create([
+            'establishment_id' => null,
+            'type' => EstablishmentType::IceArena,
+            'catalog' => MenuCatalog::Drinks,
+            'name' => 'Фреш',
+            'slug' => 'fresh',
+        ]);
+
+        $arenaSlugs = collect($this->getJson("/api/establishments/{$arena->id}/menu")->json('categories'))->pluck('slug');
+        $this->assertTrue($arenaSlugs->contains('fresh'));
+
+        $city = City::factory()->create();
+        $brand = Brand::factory()->create([
+            'city_id' => $city->id,
+            'type' => EstablishmentType::Coffee,
+        ]);
+        $shop = Establishment::factory()->create([
+            'city_id' => $city->id,
+            'brand_id' => $brand->id,
+            'type' => EstablishmentType::Coffee,
+        ]);
+
+        $shopSlugs = collect($this->getJson("/api/establishments/{$shop->id}/menu")->json('categories'))->pluck('slug');
+        $this->assertFalse($shopSlugs->contains('fresh'));
     }
 
     public function test_ice_arena_menu_hides_foodcourt_snacks(): void

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\EstablishmentType;
+use App\Enums\MenuCatalog;
 use App\Http\Requests\QuoteCoffeeItemRequest;
 use App\Http\Resources\CoffeeProductCardResource;
 use App\Http\Resources\CoffeeProductDetailResource;
@@ -35,6 +36,16 @@ class CoffeeMenuController extends Controller
             ->active()
             ->ordered()
             ->get();
+
+        if ($establishment->type === EstablishmentType::IceArena) {
+            $arenaDrinks = MenuCategory::query()
+                ->where('catalog', MenuCatalog::Drinks)
+                ->active()
+                ->ordered()
+                ->get();
+
+            $categories = $arenaDrinks->concat($categories)->unique('id')->values();
+        }
 
         $chips = collect([
             [
@@ -123,6 +134,7 @@ class CoffeeMenuController extends Controller
                 && $product->is_active
                 && (
                     $product->menuCategory?->type === EstablishmentType::Coffee
+                    || $product->menuCategory?->isArenaDrinkCategory()
                     || $product->menuCategory?->isFoodCourt()
                 ),
             404

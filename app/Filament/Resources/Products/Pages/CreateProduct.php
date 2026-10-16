@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Products\Pages;
 use App\Enums\ProductKind;
 use App\Filament\Concerns\FillsVenueTypeFromRequest;
 use App\Filament\Resources\Products\ProductResource;
+use App\Filament\Resources\Products\Schemas\ProductForm;
 use App\Filament\Support\VenueSection;
 use App\Models\MenuCategory;
 use Filament\Resources\Pages\CreateRecord;
@@ -46,9 +47,8 @@ class CreateProduct extends CreateRecord
         }
 
         $data['kind'] = $this->kindFromCategory($data['menu_category_id'] ?? null);
-        $data['food_section'] = null;
 
-        return $data;
+        return ProductForm::normalizeFoodSection($data);
     }
 
     /**

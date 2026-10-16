@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Products\Pages;
 
 use App\Enums\EstablishmentType;
+use App\Enums\MenuCatalog;
 use App\Enums\ProductKind;
 use App\Filament\Concerns\HasHaragunAndCafeTabs;
 use App\Filament\Resources\Products\ProductResource;
@@ -32,7 +33,11 @@ class ListProducts extends ListRecords
                         ->whereDoesntHave('menuCategory')
                         ->orWhereHas(
                             'menuCategory',
-                            fn (Builder $categoryQuery): Builder => $categoryQuery->where('type', '!=', EstablishmentType::Coffee),
+                            fn (Builder $categoryQuery): Builder => $categoryQuery
+                                ->where('type', '!=', EstablishmentType::Coffee)
+                                ->where(fn (Builder $catalogQuery): Builder => $catalogQuery
+                                    ->whereNull('catalog')
+                                    ->orWhere('catalog', '!=', MenuCatalog::Drinks)),
                         ))
                     ->where('kind', '!=', ProductKind::RentalSkates)),
             'haragun-skates' => Tab::make('Коньки')
@@ -51,7 +56,11 @@ class ListProducts extends ListRecords
                     )
                     ->whereHas(
                         'menuCategory',
-                        fn (Builder $categoryQuery): Builder => $categoryQuery->where('type', EstablishmentType::Coffee),
+                        fn (Builder $categoryQuery): Builder => $categoryQuery->where(
+                            fn (Builder $match): Builder => $match
+                                ->where('type', EstablishmentType::Coffee)
+                                ->orWhere('catalog', MenuCatalog::Drinks),
+                        ),
                     )),
             'cafes' => Tab::make('Кофейни')
                 ->modifyQueryUsing(fn (Builder $query): Builder => $query

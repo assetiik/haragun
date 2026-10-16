@@ -3,6 +3,7 @@
 namespace App\Filament\Navigation;
 
 use App\Enums\EstablishmentType;
+use App\Enums\MenuCatalog;
 use App\Enums\ProductKind;
 use App\Filament\Resources\Brands\BrandResource;
 use App\Filament\Resources\Establishments\EstablishmentResource;
@@ -61,7 +62,8 @@ final class AdminNavigation
                     : null,
                 recordMatches: fn (Model $record): bool => $record instanceof Product
                     && $record->kind !== ProductKind::RentalSkates
-                    && $record->menuCategory?->type !== EstablishmentType::Coffee,
+                    && $record->menuCategory?->type !== EstablishmentType::Coffee
+                    && $record->menuCategory?->catalog !== MenuCatalog::Drinks,
             ),
             self::venueItem(
                 label: 'Коньки',
@@ -87,7 +89,8 @@ final class AdminNavigation
                     ? ($record->brand?->type ?? $record->establishment?->type)
                     : null,
                 recordMatches: fn (Model $record): bool => $record instanceof Product
-                    && $record->menuCategory?->type === EstablishmentType::Coffee,
+                    && ($record->menuCategory?->type === EstablishmentType::Coffee
+                        || $record->menuCategory?->catalog === MenuCatalog::Drinks),
             ),
             self::venueItem(
                 label: 'Бренды',

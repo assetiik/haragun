@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Products\Schemas;
 
 use App\Enums\EstablishmentType;
+use App\Enums\MenuCatalog;
 use App\Filament\Support\LocalizedFields;
 use App\Filament\Support\VenueSection;
 use App\Models\Establishment;
@@ -22,6 +23,7 @@ use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Livewire\Livewire;
 
 class ProductForm
 {
@@ -108,7 +110,19 @@ class ProductForm
                             ->relationship(
                                 'menuCategory',
                                 'name',
-                                fn (Builder $query): Builder => VenueSection::constrainMenuCategories($query),
+                                function (Builder $query): Builder {
+                                    $categories = $query->where(function (Builder $grouped): void {
+                                        VenueSection::constrainMenuCategories($grouped);
+                                    });
+
+                                    $currentId = self::currentMenuCategoryId();
+
+                                    if ($currentId === null) {
+                                        return $categories;
+                                    }
+
+                                    return $categories->orWhere($query->getModel()->getQualifiedKeyName(), $currentId);
+                                },
                             )
                             ->native(false)
                             ->preload()
@@ -120,9 +134,22 @@ class ProductForm
                         Select::make('kind')
                             ->hidden()
                             ->dehydrated(false),
-                        TextInput::make('food_section')
-                            ->hidden()
-                            ->dehydrated(false),
+                        Select::make('food_section')
+                            ->label('Категория перекуса')
+                            ->options(fn (): array => MenuCategory::query()
+                                ->where('catalog', MenuCatalog::Snacks)
+                                ->active()
+                                ->ordered()
+                                ->pluck('name', 'name')
+                                ->all())
+                            ->native(false)
+                            ->searchable()
+                            ->helperText('Список берётся из Haragun → Категории, раздел «Перекус».')
+                            ->visible(fn ($livewire, Get $get): bool => ! self::isCoffeeForm($livewire) && self::categoryIsFoodCourt($get('menu_category_id')))
+                            ->dehydrated(fn ($livewire, Get $get): bool => ! self::isCoffeeForm($livewire) && self::categoryIsFoodCourt($get('menu_category_id')))
+                            ->columnSpan([
+                                'md' => 6,
+                            ]),
                         TextInput::make('price')
                             ->label(fn ($livewire, Get $get): string => self::usesDayPrice($livewire, $get) ? 'Цена в будни' : 'Цена')
                             ->required(fn ($livewire): bool => ! self::isCoffeeForm($livewire))
@@ -391,6 +418,39 @@ class ProductForm
         $data['is_available'] = (bool) ($data['is_available'] ?? true);
 
         return $data;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    public static function normalizeFoodSection(array $data): array
+    {
+        if (! self::categoryIsFoodCourt($data['menu_category_id'] ?? null)) {
+            $data['food_section'] = null;
+        }
+
+        return $data;
+    }
+
+    private static function currentMenuCategoryId(): ?int
+    {
+        $record = data_get(Livewire::current(), 'record');
+
+        if (! $record instanceof Product || $record->menu_category_id === null) {
+            return null;
+        }
+
+        return (int) $record->menu_category_id;
+    }
+
+    private static function categoryIsFoodCourt(mixed $categoryId): bool
+    {
+        if (! filled($categoryId)) {
+            return false;
+        }
+
+        return MenuCategory::query()->find($categoryId)?->isFoodCourt() ?? false;
     }
 
     private static function isCoffeeForm(object $livewire): bool

@@ -3,6 +3,7 @@
 namespace App\Filament\Support;
 
 use App\Enums\EstablishmentType;
+use App\Enums\MenuCatalog;
 use App\Enums\ProductKind;
 use App\Models\Brand;
 use App\Models\Establishment;
@@ -83,7 +84,7 @@ final class VenueSection
         if (
             $record instanceof Product
             && $record->establishment?->type === EstablishmentType::IceArena
-            && $record->menuCategory?->type === EstablishmentType::Coffee
+            && self::isHaragunDrinkCategory($record->menuCategory)
         ) {
             return self::HaragunCafe;
         }
@@ -95,7 +96,7 @@ final class VenueSection
 
             if (
                 $record->brand?->type === EstablishmentType::IceArena
-                && $record->menuCategory?->type === EstablishmentType::Coffee
+                && self::isHaragunDrinkCategory($record->menuCategory)
             ) {
                 return self::HaragunCafe;
             }
@@ -203,8 +204,16 @@ final class VenueSection
     {
         $section = self::fromRequest();
 
-        if (in_array($section, [self::Cafes, self::HaragunCafe], true)) {
+        if ($section === self::Cafes) {
             return $query->where('type', EstablishmentType::Coffee);
+        }
+
+        if ($section === self::HaragunCafe) {
+            return $query->where('catalog', MenuCatalog::Drinks);
+        }
+
+        if ($section === self::Haragun) {
+            return $query->where('type', EstablishmentType::IceArena)->whereNull('catalog');
         }
 
         $type = self::type($section);
@@ -214,5 +223,14 @@ final class VenueSection
         }
 
         return $query->where('type', $type);
+    }
+
+    public static function isHaragunDrinkCategory(?MenuCategory $category): bool
+    {
+        if ($category === null) {
+            return false;
+        }
+
+        return $category->type === EstablishmentType::Coffee || $category->isArenaDrinkCategory();
     }
 }

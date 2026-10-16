@@ -19,4 +19,18 @@ class EditMenuCategory extends EditRecord
             DeleteAction::make(),
         ];
     }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    protected function mutateFormDataBeforeSave(array $data): array
+    {
+        if (filled($data['catalog'] ?? null)) {
+            $data['establishment_id'] = null;
+            $data['requires_booking'] = false;
+        }
+
+        return $data;
+    }
 }

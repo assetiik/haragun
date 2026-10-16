@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\MenuCategories\Schemas;
 
+use App\Enums\MenuCatalog;
 use App\Filament\Support\LocalizedFields;
 use App\Filament\Support\VenueSection;
 use App\Models\Establishment;
@@ -9,6 +10,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -46,6 +48,19 @@ class MenuCategoryForm
                                 'md' => 2,
                             ]),
                         ...LocalizedFields::text('name', 'Название', 120),
+                        Select::make('catalog')
+                            ->label('Раздел')
+                            ->options([
+                                MenuCatalog::Drinks->value => 'Напитки',
+                                MenuCatalog::Snacks->value => 'Перекус',
+                            ])
+                            ->placeholder('Экран арены')
+                            ->helperText('Напитки и перекус — категории Haragun. У кофеен свои категории.')
+                            ->native(false)
+                            ->live()
+                            ->visible(fn ($livewire): bool => ! self::isCoffeeForm($livewire))
+                            ->dehydrated(fn ($livewire): bool => ! self::isCoffeeForm($livewire))
+                            ->columnSpanFull(),
                         Select::make('establishment_id')
                             ->label('Заведение')
                             ->relationship(
@@ -58,9 +73,9 @@ class MenuCategoryForm
                             )
                             ->native(false)
                             ->preload()
-                            ->required(fn ($livewire): bool => ! self::isCoffeeForm($livewire))
-                            ->dehydrated(fn ($livewire): bool => ! self::isCoffeeForm($livewire))
-                            ->visible(fn ($livewire): bool => ! self::isCoffeeForm($livewire))
+                            ->required(fn ($livewire, Get $get): bool => self::showsVenueFields($livewire, $get))
+                            ->dehydrated(fn ($livewire, Get $get): bool => self::showsVenueFields($livewire, $get))
+                            ->visible(fn ($livewire, Get $get): bool => self::showsVenueFields($livewire, $get))
                             ->default(fn (): ?int => VenueSection::defaultEstablishmentId())
                             ->columnSpanFull(),
                         Select::make('slug')
@@ -70,10 +85,10 @@ class MenuCategoryForm
                                 'foodcourt' => 'Фудкорт',
                                 'snack' => 'Перекус',
                             ])
-                            ->required(fn ($livewire): bool => ! self::isCoffeeForm($livewire))
-                            ->dehydrated(fn ($livewire): bool => ! self::isCoffeeForm($livewire))
+                            ->required(fn ($livewire, Get $get): bool => self::showsVenueFields($livewire, $get))
+                            ->dehydrated(fn ($livewire, Get $get): bool => self::showsVenueFields($livewire, $get))
                             ->native(false)
-                            ->visible(fn ($livewire): bool => ! self::isCoffeeForm($livewire))
+                            ->visible(fn ($livewire, Get $get): bool => self::showsVenueFields($livewire, $get))
                             ->columnSpan([
                                 'md' => 6,
                             ]),
@@ -81,7 +96,7 @@ class MenuCategoryForm
                             ->label('Нужна бронь')
                             ->inline(false)
                             ->default(false)
-                            ->visible(fn ($livewire): bool => ! self::isCoffeeForm($livewire))
+                            ->visible(fn ($livewire, Get $get): bool => self::showsVenueFields($livewire, $get))
                             ->columnSpan([
                                 'md' => 6,
                             ]),
@@ -89,7 +104,7 @@ class MenuCategoryForm
                             ->label('Минут на приготовление')
                             ->numeric()
                             ->default(10)
-                            ->visible(fn ($livewire): bool => ! self::isCoffeeForm($livewire))
+                            ->visible(fn ($livewire, Get $get): bool => self::showsVenueFields($livewire, $get))
                             ->columnSpan([
                                 'md' => 6,
                             ]),
@@ -101,7 +116,7 @@ class MenuCategoryForm
                 Section::make('Тексты на экране')
                     ->collapsed()
                     ->columnSpanFull()
-                    ->visible(fn ($livewire): bool => ! self::isCoffeeForm($livewire))
+                    ->visible(fn ($livewire, Get $get): bool => self::showsVenueFields($livewire, $get))
                     ->schema([
                         TextInput::make('section_title')
                             ->label('Заголовок секции · RU')
@@ -141,5 +156,10 @@ class MenuCategoryForm
             $livewire->record ?? null,
             $livewire->venueTab ?? null,
         );
+    }
+
+    private static function showsVenueFields(object $livewire, Get $get): bool
+    {
+        return ! self::isCoffeeForm($livewire) && blank($get('catalog'));
     }
 }

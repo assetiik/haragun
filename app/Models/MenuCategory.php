@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\EstablishmentType;
+use App\Enums\MenuCatalog;
 use App\Models\Concerns\HasI18n;
 use App\Support\Slugger;
 use Database\Factories\MenuCategoryFactory;
@@ -17,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable([
     'establishment_id',
     'type',
+    'catalog',
     'name',
     'slug',
     'section_title',
@@ -52,6 +54,7 @@ class MenuCategory extends Model
     {
         return [
             'type' => EstablishmentType::class,
+            'catalog' => MenuCatalog::class,
             'requires_booking' => 'boolean',
             'is_active' => 'boolean',
             'sort_order' => 'integer',
@@ -73,6 +76,11 @@ class MenuCategory extends Model
     public function isFoodCourt(): bool
     {
         return in_array($this->slug, ['foodcourt', 'snack'], true);
+    }
+
+    public function isArenaDrinkCategory(): bool
+    {
+        return $this->catalog === MenuCatalog::Drinks;
     }
 
     public function isCoffeeMenu(): bool

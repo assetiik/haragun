@@ -2,7 +2,9 @@
 
 namespace App\Filament\Resources\MenuCategories\Tables;
 
+use App\Enums\MenuCatalog;
 use App\Filament\Support\VenueSection;
+use App\Models\MenuCategory;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
@@ -30,15 +32,21 @@ class MenuCategoriesTable
                 TextColumn::make('slug')
                     ->label('Тип')
                     ->badge()
-                    ->formatStateUsing(fn (string $state): string => match ($state) {
-                        'tea' => 'Чай',
-                        'coffee' => 'Кофе',
-                        'lemonade' => 'Лимонад',
-                        'foodcourt' => 'Фудкорт',
-                        'snack' => 'Перекус',
-                        'ice_rental' => 'Лёд',
-                        'menu' => 'Меню',
-                        default => $state,
+                    ->formatStateUsing(function (string $state, MenuCategory $record): string {
+                        if ($record->catalog instanceof MenuCatalog) {
+                            return $record->catalog->label();
+                        }
+
+                        return match ($state) {
+                            'tea' => 'Чай',
+                            'coffee' => 'Кофе',
+                            'lemonade' => 'Лимонад',
+                            'foodcourt' => 'Фудкорт',
+                            'snack' => 'Перекус',
+                            'ice_rental' => 'Лёд',
+                            'menu' => 'Меню',
+                            default => $state,
+                        };
                     })
                     ->hidden(fn (): bool => VenueSection::fromRequest() === VenueSection::Cafes),
                 TextColumn::make('prep_minutes')

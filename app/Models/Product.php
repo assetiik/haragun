@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\EstablishmentType;
+use App\Enums\MenuCatalog;
 use App\Enums\ProductKind;
 use App\Models\Concerns\HasI18n;
 use App\Support\Money;
@@ -147,7 +148,11 @@ class Product extends Model
     {
         $query->food()->whereHas(
             'menuCategory',
-            fn (Builder $categoryQuery): Builder => $categoryQuery->where('type', EstablishmentType::Coffee),
+            fn (Builder $categoryQuery): Builder => $categoryQuery->where(
+                fn (Builder $match): Builder => $match
+                    ->where('type', EstablishmentType::Coffee)
+                    ->orWhere('catalog', MenuCatalog::Drinks),
+            ),
         );
     }
 
@@ -156,9 +161,12 @@ class Product extends Model
     {
         $query->food()->whereHas(
             'menuCategory',
-            fn (Builder $categoryQuery): Builder => $categoryQuery
-                ->where('type', EstablishmentType::Coffee)
-                ->orWhereIn('slug', ['foodcourt', 'snack']),
+            fn (Builder $categoryQuery): Builder => $categoryQuery->where(
+                fn (Builder $match): Builder => $match
+                    ->where('type', EstablishmentType::Coffee)
+                    ->orWhere('catalog', MenuCatalog::Drinks)
+                    ->orWhereIn('slug', ['foodcourt', 'snack']),
+            ),
         );
     }
 
