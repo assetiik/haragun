@@ -22,7 +22,6 @@ use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Livewire\Livewire;
 
 class ProductForm
 {
@@ -109,20 +108,11 @@ class ProductForm
                             ->relationship(
                                 'menuCategory',
                                 'name',
-                                function (Builder $query): Builder {
-                                    $categories = $query->where(function (Builder $grouped): void {
-                                        VenueSection::constrainMenuCategories($grouped);
-                                    });
-
-                                    $currentId = self::currentMenuCategoryId();
-
-                                    if ($currentId === null) {
-                                        return $categories;
-                                    }
-
-                                    return $categories->orWhere($query->getModel()->getQualifiedKeyName(), $currentId);
-                                },
+                                fn (Builder $query): Builder => VenueSection::constrainMenuCategories($query),
                             )
+                            ->helperText(fn ($livewire): ?string => VenueSection::fromRequest() === VenueSection::HaragunCafe
+                                ? 'Только категории из Haragun → Категории блюд'
+                                : null)
                             ->native(false)
                             ->preload()
                             ->live()
@@ -423,17 +413,6 @@ class ProductForm
         }
 
         return $data;
-    }
-
-    private static function currentMenuCategoryId(): ?int
-    {
-        $record = data_get(Livewire::current(), 'record');
-
-        if (! $record instanceof Product || $record->menu_category_id === null) {
-            return null;
-        }
-
-        return (int) $record->menu_category_id;
     }
 
     private static function categoryIsFoodCourt(mixed $categoryId): bool
