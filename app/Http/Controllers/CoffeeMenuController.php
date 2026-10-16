@@ -31,21 +31,17 @@ class CoffeeMenuController extends Controller
             'category' => ['nullable', 'string'],
         ]);
 
-        $categories = MenuCategory::query()
-            ->coffee()
-            ->active()
-            ->ordered()
-            ->get();
-
-        if ($establishment->type === EstablishmentType::IceArena) {
-            $arenaDrinks = MenuCategory::query()
+        $categories = $establishment->type === EstablishmentType::IceArena
+            ? MenuCategory::query()
                 ->where('catalog', MenuCatalog::Drinks)
                 ->active()
                 ->ordered()
+                ->get()
+            : MenuCategory::query()
+                ->coffee()
+                ->active()
+                ->ordered()
                 ->get();
-
-            $categories = $arenaDrinks->concat($categories)->unique('id')->values();
-        }
 
         $chips = collect([
             [

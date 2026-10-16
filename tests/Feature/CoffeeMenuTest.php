@@ -136,15 +136,23 @@ class CoffeeMenuTest extends TestCase
     public function test_ice_arena_menu_returns_coffee_drinks(): void
     {
         [$arena, $latte] = $this->seedCoffeeMenu(EstablishmentType::IceArena);
+        MenuCategory::factory()->create([
+            'establishment_id' => null,
+            'type' => EstablishmentType::IceArena,
+            'catalog' => MenuCatalog::Drinks,
+            'name' => 'Кофе',
+            'slug' => 'coffee',
+            'sort_order' => 2,
+        ]);
 
         $this->getJson("/api/establishments/{$arena->id}/menu")
             ->assertOk()
             ->assertJsonPath('featured.id', $latte->id)
             ->assertJsonPath('featured.name', 'Латте')
-            ->assertJsonPath('categories.2.slug', 'coffee');
+            ->assertJsonPath('categories.1.slug', 'coffee');
     }
 
-    public function test_ice_arena_menu_includes_haragun_drink_categories_and_coffee_shops_do_not(): void
+    public function test_ice_arena_menu_uses_only_haragun_drink_categories(): void
     {
         [$arena] = $this->seedCoffeeMenu(EstablishmentType::IceArena);
         MenuCategory::factory()->create([
@@ -157,6 +165,9 @@ class CoffeeMenuTest extends TestCase
 
         $arenaSlugs = collect($this->getJson("/api/establishments/{$arena->id}/menu")->json('categories'))->pluck('slug');
         $this->assertTrue($arenaSlugs->contains('fresh'));
+        $this->assertFalse($arenaSlugs->contains('tea'));
+        $this->assertFalse($arenaSlugs->contains('coffee'));
+        $this->assertFalse($arenaSlugs->contains('lemonade'));
 
         $city = City::factory()->create();
         $brand = Brand::factory()->create([
@@ -171,6 +182,7 @@ class CoffeeMenuTest extends TestCase
 
         $shopSlugs = collect($this->getJson("/api/establishments/{$shop->id}/menu")->json('categories'))->pluck('slug');
         $this->assertFalse($shopSlugs->contains('fresh'));
+        $this->assertTrue($shopSlugs->contains('tea'));
     }
 
     public function test_ice_arena_menu_hides_foodcourt_snacks(): void
