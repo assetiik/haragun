@@ -165,6 +165,7 @@ class Product extends Model
                 fn (Builder $match): Builder => $match
                     ->where('type', EstablishmentType::Coffee)
                     ->orWhere('catalog', MenuCatalog::Drinks)
+                    ->orWhere('catalog', MenuCatalog::Snacks)
                     ->orWhereIn('slug', ['foodcourt', 'snack']),
             ),
         );

@@ -83,6 +83,11 @@ class MenuCategory extends Model
         return $this->catalog === MenuCatalog::Drinks;
     }
 
+    public function isArenaFoodCategory(): bool
+    {
+        return $this->catalog === MenuCatalog::Snacks;
+    }
+
     public function isCoffeeMenu(): bool
     {
         return in_array($this->slug, ['popular', 'tea', 'coffee', 'lemonade', 'menu'], true)

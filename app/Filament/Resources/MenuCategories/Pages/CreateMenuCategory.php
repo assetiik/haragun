@@ -25,7 +25,7 @@ class CreateMenuCategory extends CreateRecord
         $data = $this->fillVenueTypeBeforeCreate($data);
 
         if (VenueSection::isFoodCategoryContext(tab: $this->venueTab)) {
-            $data['catalog'] = MenuCatalog::Drinks->value;
+            $data['catalog'] ??= MenuCatalog::Drinks->value;
             $data['establishment_id'] = null;
             $data['requires_booking'] = false;
             $data['slug'] = null;

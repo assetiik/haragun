@@ -102,11 +102,13 @@ class AdminPanelTest extends TestCase
             ->assertOk()
             ->assertSee('Арена')
             ->assertSee('Категории блюд')
+            ->assertSee('Еда')
             ->assertSee('Коньки')
             ->assertSee('Точки')
             ->assertSee('tab=haragun', false)
             ->assertSee('tab=haragun-food', false)
             ->assertSee('tab=haragun-cafe', false)
+            ->assertSee('tab=haragun-meals', false)
             ->assertSee('tab=haragun-skates', false)
             ->assertSee('tab=cafes', false)
             ->assertSee('Кофейни')
@@ -266,7 +268,7 @@ class AdminPanelTest extends TestCase
         ]);
     }
 
-    public function test_haragun_food_categories_are_created_without_a_catalog_field(): void
+    public function test_haragun_food_categories_require_drinks_or_meals_type(): void
     {
         $admin = Admin::factory()->create();
         $arena = Establishment::factory()->create([
@@ -289,13 +291,14 @@ class AdminPanelTest extends TestCase
 
         Livewire::withQueryParams(['tab' => 'haragun-food'])
             ->test(CreateMenuCategory::class)
-            ->assertFormFieldDoesNotExist('catalog')
+            ->assertFormFieldIsVisible('catalog')
             ->assertFormFieldIsHidden('establishment_id')
             ->assertFormFieldIsHidden('slug')
             ->fillForm([
                 'name' => 'Чай',
                 'sort_order' => 3,
                 'is_active' => true,
+                'catalog' => MenuCatalog::Drinks->value,
             ])
             ->call('create')
             ->assertHasNoFormErrors();
@@ -303,39 +306,88 @@ class AdminPanelTest extends TestCase
         Livewire::withQueryParams(['tab' => 'haragun-food'])
             ->test(CreateMenuCategory::class)
             ->fillForm([
-                'name' => 'Кофе',
+                'name' => 'Перекус',
                 'sort_order' => 4,
                 'is_active' => true,
+                'catalog' => MenuCatalog::Snacks->value,
             ])
             ->call('create')
             ->assertHasNoFormErrors();
 
         $tea = MenuCategory::query()->where('name', 'Чай')->first();
-        $coffee = MenuCategory::query()->where('name', 'Кофе')->first();
+        $snack = MenuCategory::query()->where('name', 'Перекус')->first();
 
         $this->assertNotNull($tea);
-        $this->assertNotNull($coffee);
+        $this->assertNotNull($snack);
         $this->assertSame(EstablishmentType::IceArena, $tea->type);
         $this->assertSame(MenuCatalog::Drinks, $tea->catalog);
         $this->assertNull($tea->establishment_id);
         $this->assertSame('tea', $tea->slug);
-        $this->assertSame(MenuCatalog::Drinks, $coffee->catalog);
-        $this->assertNull($coffee->establishment_id);
+        $this->assertSame(MenuCatalog::Snacks, $snack->catalog);
+        $this->assertNull($snack->establishment_id);
 
         Livewire::test(ListMenuCategories::class)
             ->set('activeTab', 'haragun')
             ->assertCanSeeTableRecords([$ice])
-            ->assertCanNotSeeTableRecords([$tea, $coffee, $coffeeCategory]);
+            ->assertCanNotSeeTableRecords([$tea, $snack, $coffeeCategory]);
 
         Livewire::test(ListMenuCategories::class)
             ->set('activeTab', 'haragun-food')
-            ->assertCanSeeTableRecords([$tea, $coffee])
+            ->assertCanSeeTableRecords([$tea, $snack])
             ->assertCanNotSeeTableRecords([$ice, $coffeeCategory]);
 
         Livewire::test(ListMenuCategories::class)
             ->set('activeTab', 'cafes')
             ->assertCanSeeTableRecords([$coffeeCategory])
-            ->assertCanNotSeeTableRecords([$ice, $tea, $coffee]);
+            ->assertCanNotSeeTableRecords([$ice, $tea, $snack]);
+    }
+
+    public function test_creating_haragun_food_item_hides_sizes_and_modifiers(): void
+    {
+        $admin = Admin::factory()->create();
+        $brand = Brand::factory()->create([
+            'type' => EstablishmentType::IceArena,
+            'name' => 'Ледовая арена Haragun',
+        ]);
+        $category = MenuCategory::factory()->create([
+            'establishment_id' => null,
+            'type' => EstablishmentType::IceArena,
+            'catalog' => MenuCatalog::Snacks,
+            'name' => 'Перекус',
+            'slug' => 'perekus',
+        ]);
+
+        $this->actingAs($admin, 'admin');
+
+        Livewire::withQueryParams(['tab' => 'haragun-meals'])
+            ->test(CreateProduct::class)
+            ->assertSee('Перекус')
+            ->assertFormFieldIsVisible('brand_id')
+            ->assertFormFieldIsVisible('price')
+            ->assertFormFieldIsHidden('establishment_id')
+            ->assertFormFieldIsHidden('sizes')
+            ->assertFormFieldIsHidden('modifiers')
+            ->fillForm([
+                'name' => 'Хот-дог Unique',
+                'sort_order' => 1,
+                'is_active' => true,
+                'brand_id' => $brand->id,
+                'menu_category_id' => $category->id,
+                'price' => 1500,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $product = Product::query()->where('name', 'Хот-дог Unique')->first();
+
+        $this->assertNotNull($product);
+        $this->assertSame(ProductKind::Food, $product->kind);
+        $this->assertNull($product->establishment_id);
+        $this->assertSame($brand->id, $product->brand_id);
+        $this->assertSame($category->id, $product->menu_category_id);
+        $this->assertSame(1500, $product->price);
+        $this->assertSame('Перекус', $product->food_section);
+        $this->assertSame(0, ProductSize::query()->where('product_id', $product->id)->count());
     }
 
     public function test_creating_a_coffee_drink_hides_extra_fields_and_stores_an_uploaded_photo(): void

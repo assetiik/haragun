@@ -38,6 +38,15 @@ class CreateProduct extends CreateRecord
             return $data;
         }
 
+        if (VenueSection::isMealsContext(tab: $this->venueTab)) {
+            $data['kind'] = ProductKind::Food->value;
+            $data['establishment_id'] = null;
+            $category = MenuCategory::query()->find($data['menu_category_id'] ?? null);
+            $data['food_section'] = $category?->name;
+
+            return $data;
+        }
+
         if (VenueSection::isSkateContext(tab: $this->venueTab)) {
             $data['kind'] = ProductKind::RentalSkates->value;
             $data['requires_size'] = true;

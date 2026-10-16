@@ -76,7 +76,7 @@ final class AdminNavigation
                 recordMatches: fn (Model $record): bool => $record instanceof Product
                     && $record->kind !== ProductKind::RentalSkates
                     && $record->menuCategory?->type !== EstablishmentType::Coffee
-                    && $record->menuCategory?->catalog !== MenuCatalog::Drinks,
+                    && $record->menuCategory?->catalog === null,
             ),
             self::venueItem(
                 label: 'Коньки',
@@ -104,6 +104,19 @@ final class AdminNavigation
                 recordMatches: fn (Model $record): bool => $record instanceof Product
                     && ($record->menuCategory?->type === EstablishmentType::Coffee
                         || $record->menuCategory?->catalog === MenuCatalog::Drinks),
+            ),
+            self::venueItem(
+                label: 'Еда',
+                group: 'Haragun',
+                icon: Heroicon::OutlinedShoppingBag,
+                resource: ProductResource::class,
+                tab: VenueSection::HaragunMeals,
+                sort: 7,
+                typeFromRecord: fn (Model $record): ?EstablishmentType => $record instanceof Product
+                    ? ($record->brand?->type ?? $record->establishment?->type)
+                    : null,
+                recordMatches: fn (Model $record): bool => $record instanceof Product
+                    && $record->menuCategory?->catalog === MenuCatalog::Snacks,
             ),
             self::venueItem(
                 label: 'Бренды',

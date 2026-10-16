@@ -36,6 +36,7 @@ trait HasHaragunAndCafeTabs
             'haragun' => $this->haragunTitle(),
             'haragun-food' => $this->haragunFoodTitle(),
             'haragun-cafe' => $this->haragunCafeTitle(),
+            'haragun-meals' => $this->haragunMealsTitle(),
             'haragun-skates' => $this->haragunSkatesTitle(),
             'cafes' => $this->cafeTitle(),
             default => parent::getTitle(),
@@ -55,6 +56,11 @@ trait HasHaragunAndCafeTabs
     protected function haragunCafeTitle(): string
     {
         return $this->cafeTitle();
+    }
+
+    protected function haragunMealsTitle(): string
+    {
+        return 'Еда';
     }
 
     protected function haragunSkatesTitle(): string

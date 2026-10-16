@@ -21,6 +21,8 @@ final class VenueSection
 
     public const HaragunCafe = 'haragun-cafe';
 
+    public const HaragunMeals = 'haragun-meals';
+
     public const HaragunSkates = 'haragun-skates';
 
     public const Cafes = 'cafes';
@@ -34,6 +36,7 @@ final class VenueSection
             self::Haragun,
             self::HaragunFood,
             self::HaragunCafe,
+            self::HaragunMeals,
             self::HaragunSkates,
             self::Cafes,
         ];
@@ -60,7 +63,7 @@ final class VenueSection
     {
         return match ($section ?? self::fromRequest()) {
             self::Cafes => EstablishmentType::Coffee,
-            self::Haragun, self::HaragunFood, self::HaragunCafe, self::HaragunSkates => EstablishmentType::IceArena,
+            self::Haragun, self::HaragunFood, self::HaragunCafe, self::HaragunMeals, self::HaragunSkates => EstablishmentType::IceArena,
             default => null,
         };
     }
@@ -82,6 +85,17 @@ final class VenueSection
             && $record->kind === ProductKind::RentalSkates
         ) {
             return self::HaragunSkates;
+        }
+
+        if (
+            $record instanceof Product
+            && (
+                $record->establishment?->type === EstablishmentType::IceArena
+                || $record->brand?->type === EstablishmentType::IceArena
+            )
+            && self::isHaragunFoodCategory($record->menuCategory)
+        ) {
+            return self::HaragunMeals;
         }
 
         if (
@@ -139,6 +153,17 @@ final class VenueSection
         }
 
         return in_array(self::fromRecord($record), [self::Cafes, self::HaragunCafe], true);
+    }
+
+    public static function isMealsContext(?Model $record = null, ?string $tab = null): bool
+    {
+        $section = $tab ?? self::fromRequest();
+
+        if ($section === self::HaragunMeals) {
+            return true;
+        }
+
+        return self::fromRecord($record) === self::HaragunMeals;
     }
 
     public static function isSkateContext(?Model $record = null, ?string $tab = null): bool
@@ -231,6 +256,10 @@ final class VenueSection
             return $query->where('catalog', MenuCatalog::Drinks);
         }
 
+        if ($section === self::HaragunMeals) {
+            return $query->where('catalog', MenuCatalog::Snacks);
+        }
+
         if ($section === self::HaragunFood) {
             return $query->whereNotNull('catalog');
         }
@@ -255,5 +284,10 @@ final class VenueSection
         }
 
         return $category->type === EstablishmentType::Coffee || $category->isArenaDrinkCategory();
+    }
+
+    public static function isHaragunFoodCategory(?MenuCategory $category): bool
+    {
+        return $category?->isArenaFoodCategory() ?? false;
     }
 }

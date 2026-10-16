@@ -33,6 +33,7 @@ class ProductForm
             ->components([
                 Section::make(fn ($livewire): string => match (true) {
                     self::isCoffeeForm($livewire) => 'Напиток',
+                    self::isMealsForm($livewire) => 'Еда',
                     self::isSkateForm($livewire) => 'Коньки',
                     default => 'Позиция',
                 })
@@ -110,9 +111,15 @@ class ProductForm
                                 'name',
                                 fn (Builder $query): Builder => VenueSection::constrainMenuCategories($query),
                             )
-                            ->helperText(fn ($livewire): ?string => VenueSection::fromRequest() === VenueSection::HaragunCafe
-                                ? 'Только категории из Haragun → Категории блюд'
-                                : null)
+                            ->helperText(function ($livewire): ?string {
+                                $tab = $livewire->venueTab ?? VenueSection::fromRequest();
+
+                                return match ($tab) {
+                                    VenueSection::HaragunCafe => 'Категории с типом «Напитки» из Категории блюд',
+                                    VenueSection::HaragunMeals => 'Категории с типом «Еда» из Категории блюд',
+                                    default => null,
+                                };
+                            })
                             ->native(false)
                             ->preload()
                             ->live()
@@ -436,13 +443,21 @@ class ProductForm
     {
         $tab = $livewire->venueTab ?? VenueSection::fromRequest();
 
-        if (in_array($tab, [VenueSection::Cafes, VenueSection::HaragunCafe], true)) {
+        if (in_array($tab, [VenueSection::Cafes, VenueSection::HaragunCafe, VenueSection::HaragunMeals], true)) {
             return true;
         }
 
         $record = $livewire->record ?? null;
 
         return $record instanceof Product && $record->brand_id !== null;
+    }
+
+    private static function isMealsForm(object $livewire): bool
+    {
+        return VenueSection::isMealsContext(
+            $livewire->record ?? null,
+            $livewire->venueTab ?? null,
+        );
     }
 
     private static function isSkateForm(object $livewire): bool
@@ -455,7 +470,7 @@ class ProductForm
 
     private static function usesDayPrice(object $livewire, Get $get): bool
     {
-        if (self::isCoffeeForm($livewire)) {
+        if (self::isCoffeeForm($livewire) || self::isMealsForm($livewire)) {
             return false;
         }
 

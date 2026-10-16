@@ -6,6 +6,7 @@ use App\Filament\Concerns\RedirectsToVenueIndex;
 use App\Filament\Resources\Products\ProductResource;
 use App\Filament\Resources\Products\Schemas\ProductForm;
 use App\Filament\Support\VenueSection;
+use App\Models\MenuCategory;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
 
@@ -38,6 +39,13 @@ class EditProduct extends EditRecord
      */
     protected function mutateFormDataBeforeSave(array $data): array
     {
+        if (VenueSection::isMealsContext($this->getRecord(), $this->venueTab)) {
+            $category = MenuCategory::query()->find($data['menu_category_id'] ?? null);
+            $data['food_section'] = $category?->name;
+
+            return $data;
+        }
+
         return ProductForm::normalizeFoodSection($data);
     }
 }

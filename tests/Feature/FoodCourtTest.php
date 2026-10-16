@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Enums\EstablishmentType;
+use App\Enums\MenuCatalog;
 use App\Enums\ProductKind;
+use App\Models\Brand;
 use App\Models\City;
 use App\Models\Establishment;
 use App\Models\MenuCategory;
@@ -32,6 +34,44 @@ class FoodCourtTest extends TestCase
             ->assertJsonPath('sections.1.products.0.name', 'Хот-дог')
             ->assertJsonPath('session.date', '2026-02-14')
             ->assertJsonPath('session.time', '16:00');
+    }
+
+    public function test_foodcourt_includes_brand_meals_from_dish_categories(): void
+    {
+        [$arena] = $this->seedFoodCourt();
+        $brand = Brand::factory()->create([
+            'city_id' => $arena->city_id,
+            'type' => EstablishmentType::IceArena,
+        ]);
+        $arena->update(['brand_id' => $brand->id]);
+
+        $mealsCategory = MenuCategory::factory()->create([
+            'establishment_id' => null,
+            'type' => EstablishmentType::IceArena,
+            'catalog' => MenuCatalog::Snacks,
+            'name' => 'Горячее',
+            'slug' => 'goriacee',
+        ]);
+        Product::factory()->create([
+            'brand_id' => $brand->id,
+            'establishment_id' => null,
+            'menu_category_id' => $mealsCategory->id,
+            'kind' => ProductKind::Food,
+            'name' => 'Сэндвич',
+            'price' => 1800,
+            'food_section' => 'Горячее',
+            'sort_order' => 10,
+        ]);
+
+        $response = $this->getJson("/api/establishments/{$arena->id}/foodcourt");
+
+        $response->assertOk();
+        $names = collect($response->json('products'))->pluck('name');
+        $this->assertTrue($names->contains('Сэндвич'));
+        $this->assertTrue($names->contains('Хот-дог'));
+        $sectionKeys = collect($response->json('sections'))->pluck('key');
+        $this->assertTrue($sectionKeys->contains('Горячее'));
+        $this->assertTrue($sectionKeys->contains('Перекус'));
     }
 
     public function test_quote_groups_buffet_separately(): void

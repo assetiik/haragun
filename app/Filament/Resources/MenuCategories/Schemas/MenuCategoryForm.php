@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\MenuCategories\Schemas;
 
+use App\Enums\MenuCatalog;
 use App\Filament\Support\LocalizedFields;
 use App\Filament\Support\VenueSection;
 use App\Models\Establishment;
@@ -46,6 +47,18 @@ class MenuCategoryForm
                                 'md' => 2,
                             ]),
                         ...LocalizedFields::text('name', 'Название', 120),
+                        Select::make('catalog')
+                            ->label('Тип')
+                            ->options([
+                                MenuCatalog::Drinks->value => 'Напитки',
+                                MenuCatalog::Snacks->value => 'Еда',
+                            ])
+                            ->helperText('Напитки — меню Haragun. Еда — фудкорт.')
+                            ->native(false)
+                            ->required(fn ($livewire): bool => self::isFoodCategoryForm($livewire))
+                            ->visible(fn ($livewire): bool => self::isFoodCategoryForm($livewire))
+                            ->dehydrated(fn ($livewire): bool => self::isFoodCategoryForm($livewire))
+                            ->columnSpanFull(),
                         Select::make('establishment_id')
                             ->label('Заведение')
                             ->relationship(
@@ -143,12 +156,16 @@ class MenuCategoryForm
         );
     }
 
+    private static function isFoodCategoryForm(object $livewire): bool
+    {
+        return VenueSection::isFoodCategoryContext(
+            $livewire->record ?? null,
+            $livewire->venueTab ?? null,
+        );
+    }
+
     private static function showsVenueFields(object $livewire): bool
     {
-        return ! self::isCoffeeForm($livewire)
-            && ! VenueSection::isFoodCategoryContext(
-                $livewire->record ?? null,
-                $livewire->venueTab ?? null,
-            );
+        return ! self::isCoffeeForm($livewire) && ! self::isFoodCategoryForm($livewire);
     }
 }

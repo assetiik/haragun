@@ -35,9 +35,7 @@ class ListProducts extends ListRecords
                             'menuCategory',
                             fn (Builder $categoryQuery): Builder => $categoryQuery
                                 ->where('type', '!=', EstablishmentType::Coffee)
-                                ->where(fn (Builder $catalogQuery): Builder => $catalogQuery
-                                    ->whereNull('catalog')
-                                    ->orWhere('catalog', '!=', MenuCatalog::Drinks)),
+                                ->whereNull('catalog'),
                         ))
                     ->where('kind', '!=', ProductKind::RentalSkates)),
             'haragun-skates' => Tab::make('Коньки')
@@ -62,6 +60,17 @@ class ListProducts extends ListRecords
                                 ->orWhere('catalog', MenuCatalog::Drinks),
                         ),
                     )),
+            'haragun-meals' => Tab::make('Еда')
+                ->modifyQueryUsing(fn (Builder $query): Builder => $query
+                    ->whereNotNull('brand_id')
+                    ->whereHas(
+                        'brand',
+                        fn (Builder $brandQuery): Builder => $brandQuery->where('type', EstablishmentType::IceArena),
+                    )
+                    ->whereHas(
+                        'menuCategory',
+                        fn (Builder $categoryQuery): Builder => $categoryQuery->where('catalog', MenuCatalog::Snacks),
+                    )),
             'cafes' => Tab::make('Кофейни')
                 ->modifyQueryUsing(fn (Builder $query): Builder => $query
                     ->whereNotNull('brand_id')
@@ -80,6 +89,11 @@ class ListProducts extends ListRecords
     protected function haragunCafeTitle(): string
     {
         return 'Напитки';
+    }
+
+    protected function haragunMealsTitle(): string
+    {
+        return 'Еда';
     }
 
     protected function haragunSkatesTitle(): string

@@ -11,7 +11,7 @@ enum MenuCatalog: string
     {
         return match ($this) {
             self::Drinks => 'Напитки',
-            self::Snacks => 'Перекус',
+            self::Snacks => 'Еда',
         };
     }
 }
