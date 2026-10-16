@@ -4,7 +4,6 @@ namespace App\Filament\Resources\MenuCategories\Tables;
 
 use App\Enums\MenuCatalog;
 use App\Filament\Support\VenueSection;
-use App\Models\MenuCategory;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
@@ -28,31 +27,39 @@ class MenuCategoriesTable
                 TextColumn::make('establishment.name')
                     ->label('Заведение')
                     ->searchable()
-                    ->hidden(fn (): bool => VenueSection::fromRequest() === VenueSection::Cafes),
+                    ->hidden(fn (): bool => in_array(VenueSection::fromRequest(), [
+                        VenueSection::Cafes,
+                        VenueSection::HaragunFood,
+                    ], true)),
+                TextColumn::make('catalog')
+                    ->label('Раздел')
+                    ->badge()
+                    ->formatStateUsing(fn (?MenuCatalog $state): string => $state?->label() ?? '—')
+                    ->visible(fn (): bool => VenueSection::fromRequest() === VenueSection::HaragunFood),
                 TextColumn::make('slug')
                     ->label('Тип')
                     ->badge()
-                    ->formatStateUsing(function (string $state, MenuCategory $record): string {
-                        if ($record->catalog instanceof MenuCatalog) {
-                            return $record->catalog->label();
-                        }
-
-                        return match ($state) {
-                            'tea' => 'Чай',
-                            'coffee' => 'Кофе',
-                            'lemonade' => 'Лимонад',
-                            'foodcourt' => 'Фудкорт',
-                            'snack' => 'Перекус',
-                            'ice_rental' => 'Лёд',
-                            'menu' => 'Меню',
-                            default => $state,
-                        };
+                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                        'tea' => 'Чай',
+                        'coffee' => 'Кофе',
+                        'lemonade' => 'Лимонад',
+                        'foodcourt' => 'Фудкорт',
+                        'snack' => 'Перекус',
+                        'ice_rental' => 'Лёд',
+                        'menu' => 'Меню',
+                        default => $state,
                     })
-                    ->hidden(fn (): bool => VenueSection::fromRequest() === VenueSection::Cafes),
+                    ->hidden(fn (): bool => in_array(VenueSection::fromRequest(), [
+                        VenueSection::Cafes,
+                        VenueSection::HaragunFood,
+                    ], true)),
                 TextColumn::make('prep_minutes')
                     ->label('Мин.')
                     ->sortable()
-                    ->hidden(fn (): bool => VenueSection::fromRequest() === VenueSection::Cafes),
+                    ->hidden(fn (): bool => in_array(VenueSection::fromRequest(), [
+                        VenueSection::Cafes,
+                        VenueSection::HaragunFood,
+                    ], true)),
                 IconColumn::make('is_active')
                     ->label('Активна')
                     ->boolean(),

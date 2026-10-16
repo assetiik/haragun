@@ -100,9 +100,11 @@ class AdminPanelTest extends TestCase
             ->get('/admin')
             ->assertOk()
             ->assertSee('Арена')
+            ->assertSee('Категории блюд')
             ->assertSee('Коньки')
             ->assertSee('Точки')
             ->assertSee('tab=haragun', false)
+            ->assertSee('tab=haragun-food', false)
             ->assertSee('tab=haragun-cafe', false)
             ->assertSee('tab=haragun-skates', false)
             ->assertSee('tab=cafes', false)
@@ -284,8 +286,11 @@ class AdminPanelTest extends TestCase
 
         $this->actingAs($admin, 'admin');
 
-        Livewire::withQueryParams(['tab' => 'haragun'])
+        Livewire::withQueryParams(['tab' => 'haragun-food'])
             ->test(CreateMenuCategory::class)
+            ->assertFormFieldIsVisible('catalog')
+            ->assertFormFieldIsHidden('establishment_id')
+            ->assertFormFieldIsHidden('slug')
             ->fillForm([
                 'name' => 'Чай',
                 'sort_order' => 3,
@@ -295,7 +300,7 @@ class AdminPanelTest extends TestCase
             ->call('create')
             ->assertHasNoFormErrors();
 
-        Livewire::withQueryParams(['tab' => 'haragun'])
+        Livewire::withQueryParams(['tab' => 'haragun-food'])
             ->test(CreateMenuCategory::class)
             ->fillForm([
                 'name' => 'Горячее',
@@ -320,8 +325,13 @@ class AdminPanelTest extends TestCase
 
         Livewire::test(ListMenuCategories::class)
             ->set('activeTab', 'haragun')
-            ->assertCanSeeTableRecords([$ice, $drinkCategory, $snackCategory])
-            ->assertCanNotSeeTableRecords([$coffeeCategory]);
+            ->assertCanSeeTableRecords([$ice])
+            ->assertCanNotSeeTableRecords([$drinkCategory, $snackCategory, $coffeeCategory]);
+
+        Livewire::test(ListMenuCategories::class)
+            ->set('activeTab', 'haragun-food')
+            ->assertCanSeeTableRecords([$drinkCategory, $snackCategory])
+            ->assertCanNotSeeTableRecords([$ice, $coffeeCategory]);
 
         Livewire::test(ListMenuCategories::class)
             ->set('activeTab', 'cafes')

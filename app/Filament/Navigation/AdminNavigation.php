@@ -49,6 +49,19 @@ final class AdminNavigation
                 tab: VenueSection::Haragun,
                 sort: 2,
                 typeFromRecord: fn (Model $record): ?EstablishmentType => $record instanceof MenuCategory ? $record->type : null,
+                recordMatches: fn (Model $record): bool => $record instanceof MenuCategory
+                    && $record->catalog === null,
+            ),
+            self::venueItem(
+                label: 'Категории блюд',
+                group: 'Haragun',
+                icon: Heroicon::OutlinedBookOpen,
+                resource: MenuCategoryResource::class,
+                tab: VenueSection::HaragunFood,
+                sort: 3,
+                typeFromRecord: fn (Model $record): ?EstablishmentType => $record instanceof MenuCategory ? $record->type : null,
+                recordMatches: fn (Model $record): bool => $record instanceof MenuCategory
+                    && $record->catalog !== null,
             ),
             self::venueItem(
                 label: 'Меню',
@@ -56,7 +69,7 @@ final class AdminNavigation
                 icon: Heroicon::OutlinedTicket,
                 resource: ProductResource::class,
                 tab: VenueSection::Haragun,
-                sort: 3,
+                sort: 4,
                 typeFromRecord: fn (Model $record): ?EstablishmentType => $record instanceof Product
                     ? ($record->brand?->type ?? $record->establishment?->type)
                     : null,
@@ -71,7 +84,7 @@ final class AdminNavigation
                 icon: Heroicon::OutlinedSquares2x2,
                 resource: ProductResource::class,
                 tab: VenueSection::HaragunSkates,
-                sort: 4,
+                sort: 5,
                 typeFromRecord: fn (Model $record): ?EstablishmentType => $record instanceof Product
                     ? ($record->brand?->type ?? $record->establishment?->type)
                     : null,
@@ -84,7 +97,7 @@ final class AdminNavigation
                 icon: Heroicon::OutlinedCube,
                 resource: ProductResource::class,
                 tab: VenueSection::HaragunCafe,
-                sort: 5,
+                sort: 6,
                 typeFromRecord: fn (Model $record): ?EstablishmentType => $record instanceof Product
                     ? ($record->brand?->type ?? $record->establishment?->type)
                     : null,

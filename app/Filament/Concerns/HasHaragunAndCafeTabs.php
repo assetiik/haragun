@@ -34,6 +34,7 @@ trait HasHaragunAndCafeTabs
     {
         return match ($this->activeTab) {
             'haragun' => $this->haragunTitle(),
+            'haragun-food' => $this->haragunFoodTitle(),
             'haragun-cafe' => $this->haragunCafeTitle(),
             'haragun-skates' => $this->haragunSkatesTitle(),
             'cafes' => $this->cafeTitle(),
@@ -44,6 +45,11 @@ trait HasHaragunAndCafeTabs
     protected function haragunTitle(): string
     {
         return (string) parent::getTitle();
+    }
+
+    protected function haragunFoodTitle(): string
+    {
+        return $this->haragunTitle();
     }
 
     protected function haragunCafeTitle(): string

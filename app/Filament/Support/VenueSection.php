@@ -17,6 +17,8 @@ final class VenueSection
 {
     public const Haragun = 'haragun';
 
+    public const HaragunFood = 'haragun-food';
+
     public const HaragunCafe = 'haragun-cafe';
 
     public const HaragunSkates = 'haragun-skates';
@@ -30,6 +32,7 @@ final class VenueSection
     {
         return [
             self::Haragun,
+            self::HaragunFood,
             self::HaragunCafe,
             self::HaragunSkates,
             self::Cafes,
@@ -57,7 +60,7 @@ final class VenueSection
     {
         return match ($section ?? self::fromRequest()) {
             self::Cafes => EstablishmentType::Coffee,
-            self::Haragun, self::HaragunCafe, self::HaragunSkates => EstablishmentType::IceArena,
+            self::Haragun, self::HaragunFood, self::HaragunCafe, self::HaragunSkates => EstablishmentType::IceArena,
             default => null,
         };
     }
@@ -102,6 +105,10 @@ final class VenueSection
             }
         }
 
+        if ($record instanceof MenuCategory && $record->catalog !== null) {
+            return self::HaragunFood;
+        }
+
         $type = match (true) {
             $record instanceof Brand, $record instanceof Establishment => $record->type,
             $record instanceof MenuCategory => $record->type ?? $record->establishment?->type,
@@ -110,6 +117,17 @@ final class VenueSection
         };
 
         return self::fromType($type);
+    }
+
+    public static function isFoodCategoryContext(?Model $record = null, ?string $tab = null): bool
+    {
+        $section = $tab ?? self::fromRequest();
+
+        if ($section === self::HaragunFood) {
+            return true;
+        }
+
+        return self::fromRecord($record) === self::HaragunFood;
     }
 
     public static function isCafeContext(?Model $record = null, ?string $tab = null): bool
@@ -210,6 +228,10 @@ final class VenueSection
 
         if ($section === self::HaragunCafe) {
             return $query->where('catalog', MenuCatalog::Drinks);
+        }
+
+        if ($section === self::HaragunFood) {
+            return $query->whereNotNull('catalog');
         }
 
         if ($section === self::Haragun) {
