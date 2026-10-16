@@ -119,6 +119,67 @@ class OrderApiTest extends TestCase
             ->assertJsonPath('sections.1.orders.0.number', 3902);
     }
 
+    public function test_orders_index_puts_arena_foodcourt_orders_on_tickets_tab(): void
+    {
+        $user = User::factory()->create();
+        $coffee = Establishment::factory()->create([
+            'type' => EstablishmentType::Coffee,
+            'name' => 'Кофейня «Арбат»',
+        ]);
+        $arena = Establishment::factory()->create([
+            'type' => EstablishmentType::IceArena,
+            'name' => 'Ледовая арена Haragun',
+        ]);
+
+        $coffeeOrder = Order::factory()->create([
+            'user_id' => $user->id,
+            'establishment_id' => $coffee->id,
+            'type' => OrderType::Venue,
+            'status' => OrderStatus::Preparing,
+            'number' => 100,
+            'summary_short' => '1 напиток',
+        ]);
+        $foodcourtOrder = Order::factory()->create([
+            'user_id' => $user->id,
+            'establishment_id' => $arena->id,
+            'type' => OrderType::Venue,
+            'status' => OrderStatus::Preparing,
+            'number' => 144,
+            'summary_short' => '1 напиток',
+        ]);
+        $ticketOrder = Order::factory()->create([
+            'user_id' => $user->id,
+            'establishment_id' => $arena->id,
+            'type' => OrderType::Tickets,
+            'status' => OrderStatus::Confirmed,
+            'number' => 5588,
+            'session_date' => now()->addDay()->toDateString(),
+            'session_time' => '16:00:00',
+        ]);
+
+        Sanctum::actingAs($user);
+
+        $venue = $this->getJson('/api/orders?type=venue')->assertOk();
+        $venueNumbers = collect($venue->json('sections.0.orders'))->pluck('number')
+            ->merge(collect($venue->json('sections.1.orders'))->pluck('number'));
+        $this->assertTrue($venueNumbers->contains(100));
+        $this->assertFalse($venueNumbers->contains(144));
+        $this->assertFalse($venueNumbers->contains(5588));
+        $this->assertSame(1, $venue->json('tabs.0.count'));
+
+        $tickets = $this->getJson('/api/orders?type=tickets')->assertOk();
+        $ticketNumbers = collect($tickets->json('sections.0.orders'))->pluck('number')
+            ->merge(collect($tickets->json('sections.1.orders'))->pluck('number'));
+        $this->assertTrue($ticketNumbers->contains(144));
+        $this->assertTrue($ticketNumbers->contains(5588));
+        $this->assertFalse($ticketNumbers->contains(100));
+        $this->assertSame(2, $tickets->json('tabs.1.count'));
+
+        $this->assertDatabaseHas('orders', ['id' => $coffeeOrder->id, 'type' => 'venue']);
+        $this->assertDatabaseHas('orders', ['id' => $foodcourtOrder->id, 'type' => 'venue']);
+        $this->assertDatabaseHas('orders', ['id' => $ticketOrder->id, 'type' => 'tickets']);
+    }
+
     public function test_user_can_view_own_order_details(): void
     {
         Carbon::setTestNow(Carbon::parse('2026-09-23 12:08:00'));

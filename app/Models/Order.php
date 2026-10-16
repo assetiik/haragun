@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\EstablishmentType;
 use App\Enums\OrderStatus;
 use App\Enums\OrderType;
 use App\Observers\OrderObserver;
@@ -189,6 +190,36 @@ class Order extends Model
     protected function ofType(Builder $query, OrderType|string $type): void
     {
         $query->where('type', $type instanceof OrderType ? $type->value : $type);
+    }
+
+    /**
+     * App "Мои заказы" tabs: coffee shops vs ice arena (tickets + foodcourt/drinks).
+     */
+    #[Scope]
+    protected function forListTab(Builder $query, OrderType|string $tab): void
+    {
+        $tab = $tab instanceof OrderType ? $tab : OrderType::from($tab);
+
+        if ($tab === OrderType::Venue) {
+            $query->where('type', OrderType::Venue)
+                ->whereHas(
+                    'establishment',
+                    fn (Builder $establishment): Builder => $establishment->where('type', EstablishmentType::Coffee),
+                );
+
+            return;
+        }
+
+        $query->where(function (Builder $orders): void {
+            $orders->where('type', OrderType::Tickets)
+                ->orWhere(function (Builder $arenaVenue): void {
+                    $arenaVenue->where('type', OrderType::Venue)
+                        ->whereHas(
+                            'establishment',
+                            fn (Builder $establishment): Builder => $establishment->where('type', EstablishmentType::IceArena),
+                        );
+                });
+        });
     }
 
     public function isActive(): bool

@@ -29,7 +29,7 @@ class OrderController extends Controller
         $orders = Order::query()
             ->with(['establishment', 'items.product'])
             ->forUser($userId)
-            ->ofType($type)
+            ->forListTab($type)
             ->latest('id')
             ->get();
 
@@ -37,9 +37,9 @@ class OrderController extends Controller
         $history = $orders->reject(fn (Order $order) => $order->isActive())->values();
 
         $counts = [
-            OrderType::Venue->value => Order::query()->forUser($userId)->ofType(OrderType::Venue)->get()
+            OrderType::Venue->value => Order::query()->forUser($userId)->forListTab(OrderType::Venue)->get()
                 ->filter(fn (Order $order) => $order->isActive())->count(),
-            OrderType::Tickets->value => Order::query()->forUser($userId)->ofType(OrderType::Tickets)->get()
+            OrderType::Tickets->value => Order::query()->forUser($userId)->forListTab(OrderType::Tickets)->get()
                 ->filter(fn (Order $order) => $order->isActive())->count(),
         ];
 
