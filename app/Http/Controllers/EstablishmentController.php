@@ -9,6 +9,7 @@ use App\Http\Resources\ProductResource;
 use App\Models\Establishment;
 use App\Models\MenuCategory;
 use App\Models\Product;
+use App\Services\DssSoft\DssSoftCatalog;
 use App\Services\EstablishmentBookingService;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
@@ -18,7 +19,10 @@ use Illuminate\Support\Collection;
 #[Group('Arena', weight: 4)]
 class EstablishmentController extends Controller
 {
-    public function __construct(private EstablishmentBookingService $booking) {}
+    public function __construct(
+        private EstablishmentBookingService $booking,
+        private DssSoftCatalog $dss,
+    ) {}
 
     public function show(Request $request, Establishment $establishment): JsonResponse
     {
@@ -29,6 +33,7 @@ class EstablishmentController extends Controller
             'lng' => ['nullable', 'numeric', 'between:-180,180'],
             'category' => ['nullable', 'string'],
             'date' => ['nullable', 'date_format:Y-m-d'],
+            'time' => ['nullable', 'date_format:H:i'],
         ]);
 
         $latitude = isset($validated['lat']) ? (float) $validated['lat'] : null;
@@ -49,9 +54,16 @@ class EstablishmentController extends Controller
         $slots = [];
 
         if ($selectedCategory?->requires_booking) {
-            $dates = $this->booking->dates($establishment);
-            $selectedDate = $this->booking->resolveDate($establishment, $validated['date'] ?? null);
-            $slots = $this->booking->slots($establishment, $selectedDate);
+            if ($this->dss->usesDss($establishment)) {
+                $dates = $this->dss->dates();
+                $selectedDate = $this->dss->resolveDate($validated['date'] ?? null);
+                $slots = $selectedDate === null ? [] : $this->dss->slots($selectedDate);
+            } else {
+                $dates = $this->booking->dates($establishment);
+                $selectedDate = $this->booking->resolveDate($establishment, $validated['date'] ?? null);
+                $slots = $this->booking->slots($establishment, $selectedDate);
+            }
+
             $request->attributes->set('booking_date', $selectedDate);
         }
 
@@ -71,6 +83,10 @@ class EstablishmentController extends Controller
                     ->all();
             } else {
                 $products = $selectedCategory->products()->tickets()->active()->ordered()->get();
+
+                if ($this->dss->usesDss($establishment) && $selectedDate !== null && isset($validated['time'])) {
+                    $products = $this->dss->applyPrices($products, $selectedDate, $validated['time']);
+                }
             }
         }
 

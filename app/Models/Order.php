@@ -30,6 +30,9 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'number',
     'guest_number',
     'code',
+    'dss_order_id',
+    'dss_day_id',
+    'dss_slot_id',
     'session_date',
     'session_time',
     'session_ends_at',
@@ -78,6 +81,9 @@ class Order extends Model
             'type' => OrderType::class,
             'status' => OrderStatus::class,
             'session_date' => 'date',
+            'dss_order_id' => 'integer',
+            'dss_day_id' => 'integer',
+            'dss_slot_id' => 'integer',
             'number' => 'integer',
             'guest_number' => 'integer',
             'subtotal' => 'integer',
@@ -360,6 +366,17 @@ class Order extends Model
         $time = substr((string) $this->session_ends_at, 0, 5);
 
         return Carbon::parse($this->session_date->toDateString().' '.$time);
+    }
+
+    public function passOpensAt(): ?CarbonInterface
+    {
+        $start = $this->sessionStartsAt();
+
+        if ($start === null) {
+            return null;
+        }
+
+        return $start->copy()->subMinutes((int) config('services.dss_soft.entry_opens_minutes_before', 60));
     }
 
     public function formattedSessionTime(): ?string

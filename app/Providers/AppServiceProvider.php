@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Services\DssSoft\DssSoftCatalog;
+use App\Services\DssSoft\DssSoftClient;
 use Filament\Tables\Table;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\Gate;
@@ -14,7 +16,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(DssSoftClient::class);
+        $this->app->singleton(DssSoftCatalog::class);
     }
 
     /**

@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'unit_price',
     'amount',
     'sizes',
+    'barcodes',
     'icon_key',
     'image_url',
     'is_discount',
@@ -39,6 +40,7 @@ class OrderItem extends Model
             'unit_price' => 'integer',
             'amount' => 'integer',
             'sizes' => 'array',
+            'barcodes' => 'array',
             'is_discount' => 'boolean',
             'sort_order' => 'integer',
         ];

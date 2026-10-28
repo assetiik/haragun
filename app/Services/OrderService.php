@@ -5,15 +5,24 @@ namespace App\Services;
 use App\Enums\OrderStatus;
 use App\Enums\OrderType;
 use App\Enums\ProductKind;
+use App\Models\Establishment;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\User;
+use App\Services\DssSoft\DssSoftCatalog;
+use App\Services\DssSoft\DssSoftClient;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Throwable;
 
 class OrderService
 {
-    public function __construct(private OrderQuoteService $quotes) {}
+    public function __construct(
+        private OrderQuoteService $quotes,
+        private DssSoftCatalog $dss,
+        private DssSoftClient $dssClient,
+    ) {}
 
     /**
      * @param  array{
@@ -27,60 +36,178 @@ class OrderService
     public function create(User $user, array $payload): Order
     {
         $quote = $this->quotes->quote($payload);
+        $type = $this->resolveType($quote['lines']);
+        $establishment = Establishment::query()->findOrFail($payload['establishment_id']);
+        $ticketLines = collect($quote['lines'])
+            ->filter(fn (array $line): bool => $line['kind'] === ProductKind::Ticket->value && ! $line['is_discount']);
 
-        return DB::transaction(function () use ($user, $payload, $quote) {
-            $type = $this->resolveType($quote['lines']);
-            $number = $this->nextNumber();
-            $now = now();
-            $sessionEnds = $this->sessionEndsAt($payload['time']);
+        $slot = null;
+        $dssHold = null;
+        $order = null;
+        $confirmed = false;
 
-            $order = Order::query()->create([
-                'user_id' => $user->id,
-                'establishment_id' => $payload['establishment_id'],
-                'type' => $type,
-                'status' => $type === OrderType::Tickets ? OrderStatus::Confirmed : OrderStatus::Accepted,
-                'number' => $number,
-                'code' => 'HRG-'.$number,
-                'session_date' => $payload['date'],
-                'session_time' => $payload['time'].':00',
-                'session_ends_at' => $sessionEnds,
-                'subtotal' => $quote['subtotal'],
-                'discount_total' => $quote['discount_total'],
-                'total' => $quote['total'],
-                'items_count' => $quote['items_count'],
-                'summary_title' => $this->summaryTitle($quote['lines']),
-                'summary_short' => $this->summaryShort($quote['lines']),
-                'payment_label' => $payload['payment_label'] ?? 'Kaspi Gold · 4417',
-                'points_to_earn' => (int) floor($quote['total'] / 20),
-                'prep_minutes' => $type === OrderType::Venue ? 5 : null,
-                'paid_at' => $now,
-                'accepted_at' => $now,
-                'preparing_at' => null,
-                'ready_at' => null,
-                'completed_at' => null,
-            ]);
+        try {
+            if ($type === OrderType::Tickets && $this->dss->usesDss($establishment) && $ticketLines->isNotEmpty()) {
+                $slot = $this->dss->resolveSlot($payload['date'], $payload['time']);
+                $dssHold = $this->dssClient->createOrder($this->dssOrderPayload($user, $ticketLines->all(), $slot));
+            }
 
-            foreach (array_values($quote['lines']) as $index => $line) {
-                $name = $line['name'] ?? $line['code'] ?? '';
+            $order = DB::transaction(function () use ($user, $payload, $quote, $type, $slot, $dssHold) {
+                $number = $this->nextNumber();
+                $now = now();
+                $sessionEnds = $slot['ends_at'] ?? $this->sessionEndsAt($payload['time']);
 
-                OrderItem::query()->create([
-                    'order_id' => $order->id,
-                    'product_id' => $line['product_id'],
-                    'kind' => $line['kind'],
-                    'name' => $name,
-                    'subtitle' => $this->itemSubtitle($line),
-                    'quantity' => $line['quantity'],
-                    'unit_price' => $line['unit_price'],
-                    'amount' => $line['amount'],
-                    'sizes' => $line['sizes'] ?: null,
-                    'icon_key' => $this->iconKey($line['kind'], $name),
-                    'is_discount' => (bool) $line['is_discount'],
-                    'sort_order' => $index + 1,
+                $order = Order::query()->create([
+                    'user_id' => $user->id,
+                    'establishment_id' => $payload['establishment_id'],
+                    'type' => $type,
+                    'status' => $type === OrderType::Tickets ? OrderStatus::Confirmed : OrderStatus::Accepted,
+                    'number' => $number,
+                    'code' => 'HRG-'.$number,
+                    'dss_order_id' => $dssHold['id'] ?? null,
+                    'dss_day_id' => $slot['dss_day_id'] ?? null,
+                    'dss_slot_id' => $slot['dss_slot_id'] ?? null,
+                    'session_date' => $payload['date'],
+                    'session_time' => $payload['time'].':00',
+                    'session_ends_at' => strlen($sessionEnds) === 5 ? $sessionEnds.':00' : $sessionEnds,
+                    'subtotal' => $quote['subtotal'],
+                    'discount_total' => $quote['discount_total'],
+                    'total' => $quote['total'],
+                    'items_count' => $quote['items_count'],
+                    'summary_title' => $this->summaryTitle($quote['lines']),
+                    'summary_short' => $this->summaryShort($quote['lines']),
+                    'payment_label' => $payload['payment_label'] ?? 'Kaspi Gold · 4417',
+                    'points_to_earn' => (int) floor($quote['total'] / 20),
+                    'prep_minutes' => $type === OrderType::Venue ? 5 : null,
+                    'paid_at' => $now,
+                    'accepted_at' => $now,
+                    'preparing_at' => null,
+                    'ready_at' => null,
+                    'completed_at' => null,
                 ]);
+
+                foreach (array_values($quote['lines']) as $index => $line) {
+                    $name = $line['name'] ?? $line['code'] ?? '';
+
+                    OrderItem::query()->create([
+                        'order_id' => $order->id,
+                        'product_id' => $line['product_id'],
+                        'kind' => $line['kind'],
+                        'name' => $name,
+                        'subtitle' => $this->itemSubtitle($line),
+                        'quantity' => $line['quantity'],
+                        'unit_price' => $line['unit_price'],
+                        'amount' => $line['amount'],
+                        'sizes' => $line['sizes'] ?: null,
+                        'icon_key' => $this->iconKey($line['kind'], $name),
+                        'is_discount' => (bool) $line['is_discount'],
+                        'sort_order' => $index + 1,
+                    ]);
+                }
+
+                return $order;
+            });
+
+            if (is_array($dssHold) && isset($dssHold['id'])) {
+                $dssOrder = $this->dssClient->confirmOrder((int) $dssHold['id']);
+                $confirmed = true;
+                $this->attachBarcodes($order, $dssOrder, $ticketLines->all());
             }
 
             return $order->load(['items', 'establishment']);
-        });
+        } catch (Throwable $exception) {
+            if (! $confirmed && is_array($dssHold) && isset($dssHold['id'])) {
+                try {
+                    $this->dssClient->cancelOrder((int) $dssHold['id']);
+                } catch (Throwable $cancelException) {
+                    Log::warning('Не удалось отменить бронь DSS-Soft', [
+                        'dss_order_id' => $dssHold['id'],
+                        'error' => $cancelException->getMessage(),
+                    ]);
+                }
+
+                $order?->delete();
+            }
+
+            throw $exception;
+        }
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $ticketLines
+     * @param  array{dss_day_id: int, dss_slot_id: int}  $slot
+     * @return array<string, mixed>
+     */
+    private function dssOrderPayload(User $user, array $ticketLines, array $slot): array
+    {
+        $cart = [];
+
+        foreach ($ticketLines as $line) {
+            $priceGroupId = (int) ($line['dss_pricegroup_id'] ?? 0);
+
+            for ($index = 0; $index < (int) $line['quantity']; $index++) {
+                $cart[] = ['pricegroup_id' => $priceGroupId];
+            }
+        }
+
+        return [
+            'cart' => $cart,
+            'name' => filled($user->name) ? $user->name : 'Гость '.$user->guestNumber(),
+            'phone' => $this->dssPhone($user),
+            'email' => (string) config('haragun.contacts.email'),
+            'dayId' => $slot['dss_day_id'],
+            'slotId' => $slot['dss_slot_id'],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $dssOrder
+     * @param  list<array<string, mixed>>  $ticketLines
+     */
+    private function attachBarcodes(Order $order, array $dssOrder, array $ticketLines): void
+    {
+        $byGroup = collect($dssOrder['items'] ?? [])
+            ->groupBy(fn (mixed $item): int => (int) data_get($item, 'pricegroup_id', 0))
+            ->map(fn ($items) => collect($items)
+                ->map(fn (mixed $item): string => (string) data_get($item, 'barcode', ''))
+                ->filter()
+                ->values());
+
+        $available = $byGroup->flatten()->values();
+
+        foreach ($order->items()->get() as $item) {
+            if ($item->kind !== ProductKind::Ticket->value || $item->is_discount) {
+                continue;
+            }
+
+            $line = collect($ticketLines)->firstWhere('product_id', $item->product_id);
+            $groupId = (int) ($line['dss_pricegroup_id'] ?? 0);
+            $needed = (int) $item->quantity;
+            $codes = [];
+
+            if ($groupId > 0 && $byGroup->has($groupId)) {
+                $codes = $byGroup[$groupId]->splice(0, $needed)->all();
+            }
+
+            if ($codes === []) {
+                $codes = $available->splice(0, $needed)->all();
+            }
+
+            $item->update([
+                'barcodes' => $codes === [] ? null : array_values($codes),
+            ]);
+        }
+    }
+
+    private function dssPhone(User $user): string
+    {
+        $digits = preg_replace('/\D+/', '', $user->phone) ?? '';
+
+        if (strlen($digits) === 11 && str_starts_with($digits, '8')) {
+            $digits = '7'.substr($digits, 1);
+        }
+
+        return str_starts_with($digits, '+') ? $digits : '+'.$digits;
     }
 
     /**

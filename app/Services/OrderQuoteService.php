@@ -5,12 +5,15 @@ namespace App\Services;
 use App\Enums\ProductKind;
 use App\Models\Establishment;
 use App\Models\Product;
+use App\Services\DssSoft\DssSoftCatalog;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
 class OrderQuoteService
 {
+    public function __construct(private DssSoftCatalog $dss) {}
+
     /**
      * @param  array{
      *     establishment_id: int,
@@ -48,7 +51,7 @@ class OrderQuoteService
                 ]);
             }
 
-            $lines->push($this->buildLine($product, $item, $date));
+            $lines->push($this->buildLine($product, $item, $establishment, $date, $time));
         }
 
         $discountLines = $this->discounts($lines, $date);
@@ -82,7 +85,7 @@ class OrderQuoteService
      * @param  array{product_id: int, quantity?: int, sizes?: list<int>}  $item
      * @return array<string, mixed>
      */
-    private function buildLine(Product $product, array $item, Carbon $date): array
+    private function buildLine(Product $product, array $item, Establishment $establishment, Carbon $date, string $time): array
     {
         if ($product->kind === ProductKind::RentalSkates) {
             $sizes = collect($item['sizes'] ?? [])->map(fn ($size) => (int) $size)->values();
@@ -124,6 +127,21 @@ class OrderQuoteService
 
         $quantity = max(1, (int) ($item['quantity'] ?? 1));
         $unitPrice = $product->priceOn($date);
+        $priceGroupId = null;
+
+        if ($product->kind === ProductKind::Ticket && $this->dss->usesDss($establishment)) {
+            $group = $this->dss->priceGroupFor($product, $date->toDateString(), $time);
+
+            if ($group === null || $group['id'] === 0) {
+                throw ValidationException::withMessages([
+                    'items' => ["Для «{$product->name}» нет ценовой группы в билетной системе."],
+                ]);
+            }
+
+            $unitPrice = $group['price'];
+            $priceGroupId = $group['id'];
+        }
+
         $amount = $quantity * $unitPrice;
 
         return [
@@ -135,6 +153,7 @@ class OrderQuoteService
             'amount' => $amount,
             'sizes' => [],
             'is_discount' => false,
+            'dss_pricegroup_id' => $priceGroupId,
         ];
     }
 
