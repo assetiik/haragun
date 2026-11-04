@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\HasI18n;
+use App\Support\StoredUrl;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 
@@ -16,6 +17,8 @@ use Illuminate\Database\Eloquent\Model;
     'contacts_email',
     'contacts_address',
     'contacts_hours',
+    'privacy_policy_title',
+    'privacy_policy_documents',
     'i18n',
 ])]
 class SiteSetting extends Model
@@ -27,7 +30,14 @@ class SiteSetting extends Model
      */
     protected function translatableAttributes(): array
     {
-        return ['about_title', 'about_text', 'contacts_title', 'contacts_address', 'contacts_hours'];
+        return [
+            'about_title',
+            'about_text',
+            'contacts_title',
+            'contacts_address',
+            'contacts_hours',
+            'privacy_policy_title',
+        ];
     }
 
     /**
@@ -36,6 +46,7 @@ class SiteSetting extends Model
     protected function casts(): array
     {
         return [
+            'privacy_policy_documents' => 'array',
             'i18n' => 'array',
         ];
     }
@@ -52,6 +63,8 @@ class SiteSetting extends Model
             'contacts_email' => config('haragun.contacts.email'),
             'contacts_address' => config('haragun.contacts.address'),
             'contacts_hours' => config('haragun.contacts.hours'),
+            'privacy_policy_title' => config('haragun.privacy_policy.title', 'Политика конфиденциальности'),
+            'privacy_policy_documents' => [],
         ]);
     }
 
@@ -79,6 +92,28 @@ class SiteSetting extends Model
             'email' => $this->contacts_email,
             'address' => $this->contacts_address,
             'hours' => $this->contacts_hours,
+        ];
+    }
+
+    /**
+     * @return array{title: string, documents: list<array{url: string, name: string}>}
+     */
+    public function privacyPolicyPayload(): array
+    {
+        $paths = collect($this->privacy_policy_documents ?? [])
+            ->filter(fn (mixed $path): bool => is_string($path) && $path !== '')
+            ->values();
+
+        return [
+            'title' => $this->privacy_policy_title ?: 'Политика конфиденциальности',
+            'documents' => $paths
+                ->map(function (string $path): array {
+                    return [
+                        'url' => StoredUrl::public($path) ?? $path,
+                        'name' => basename($path),
+                    ];
+                })
+                ->all(),
         ];
     }
 }

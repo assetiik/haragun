@@ -21,4 +21,12 @@ final class SiteContent
     {
         return SiteSetting::current()->contactsPayload();
     }
+
+    /**
+     * @return array{title: string, text: ?string}
+     */
+    public static function privacyPolicy(): array
+    {
+        return SiteSetting::current()->privacyPolicyPayload();
+    }
 }

@@ -6,6 +6,7 @@ use App\Filament\Support\LocalizedFields;
 use App\Models\SiteSetting;
 use BackedEnum;
 use Filament\Actions\Action;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
@@ -28,9 +29,9 @@ class ManageSiteSettings extends Page
 
     protected static string|UnitEnum|null $navigationGroup = 'Сайт';
 
-    protected static ?string $navigationLabel = 'О приложении и контакты';
+    protected static ?string $navigationLabel = 'О приложении и политика';
 
-    protected static ?string $title = 'О приложении и контакты';
+    protected static ?string $title = 'О приложении, контакты и политика';
 
     protected static ?int $navigationSort = 6;
 
@@ -51,6 +52,8 @@ class ManageSiteSettings extends Page
             'contacts_email',
             'contacts_address',
             'contacts_hours',
+            'privacy_policy_title',
+            'privacy_policy_documents',
             'i18n',
         ]));
     }
@@ -110,6 +113,32 @@ class ManageSiteSettings extends Page
                             ->label('Часы работы · RU')
                             ->maxLength(120),
                         ...LocalizedFields::text('contacts_hours', 'Часы работы', 120),
+                    ])
+                    ->columns(2),
+                Section::make('Политика конфиденциальности')
+                    ->schema([
+                        TextInput::make('privacy_policy_title')
+                            ->label('Заголовок · RU')
+                            ->required()
+                            ->maxLength(150),
+                        ...LocalizedFields::text('privacy_policy_title', 'Заголовок', 150),
+                        FileUpload::make('privacy_policy_documents')
+                            ->label('Документы')
+                            ->helperText('PDF или Word. Можно несколько файлов — на фронте откроются по ссылке.')
+                            ->multiple()
+                            ->reorderable()
+                            ->downloadable()
+                            ->openable()
+                            ->acceptedFileTypes([
+                                'application/pdf',
+                                'application/msword',
+                                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                            ])
+                            ->disk('public')
+                            ->directory('privacy-policy')
+                            ->visibility('public')
+                            ->maxSize(20480)
+                            ->columnSpanFull(),
                     ])
                     ->columns(2),
             ]);

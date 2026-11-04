@@ -34,6 +34,7 @@ class ProfileScreenResource extends JsonResource
             'language' => 'ru',
             'about' => SiteContent::about(),
             'contacts' => SiteContent::contacts(),
+            'privacy_policy' => SiteContent::privacyPolicy(),
         ];
     }
 }

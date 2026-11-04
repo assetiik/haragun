@@ -19,6 +19,7 @@ class ApiDocsTest extends TestCase
         $paths = array_keys($response->json('paths') ?? []);
 
         $this->assertContains('/home', $paths);
+        $this->assertContains('/privacy-policy', $paths);
         $this->assertContains('/auth/send-code', $paths);
         $this->assertContains('/auth/verify-code', $paths);
         $this->assertContains('/establishments/{establishment}', $paths);
