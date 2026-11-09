@@ -19,6 +19,8 @@ use Illuminate\Database\Eloquent\Model;
     'contacts_hours',
     'privacy_policy_title',
     'privacy_policy_documents',
+    'offer_title',
+    'offer_documents',
     'i18n',
 ])]
 class SiteSetting extends Model
@@ -37,6 +39,7 @@ class SiteSetting extends Model
             'contacts_address',
             'contacts_hours',
             'privacy_policy_title',
+            'offer_title',
         ];
     }
 
@@ -47,6 +50,7 @@ class SiteSetting extends Model
     {
         return [
             'privacy_policy_documents' => 'array',
+            'offer_documents' => 'array',
             'i18n' => 'array',
         ];
     }
@@ -65,6 +69,8 @@ class SiteSetting extends Model
             'contacts_hours' => config('haragun.contacts.hours'),
             'privacy_policy_title' => config('haragun.privacy_policy.title', 'Политика конфиденциальности'),
             'privacy_policy_documents' => [],
+            'offer_title' => config('haragun.offer.title', 'Оферта'),
+            'offer_documents' => [],
         ]);
     }
 
@@ -100,12 +106,37 @@ class SiteSetting extends Model
      */
     public function privacyPolicyPayload(): array
     {
-        $paths = collect($this->privacy_policy_documents ?? [])
+        return $this->documentsPayload(
+            $this->privacy_policy_title,
+            $this->privacy_policy_documents,
+            'Политика конфиденциальности',
+        );
+    }
+
+    /**
+     * @return array{title: string, documents: list<array{url: string, name: string}>}
+     */
+    public function offerPayload(): array
+    {
+        return $this->documentsPayload(
+            $this->offer_title,
+            $this->offer_documents,
+            'Оферта',
+        );
+    }
+
+    /**
+     * @param  list<mixed>|null  $documents
+     * @return array{title: string, documents: list<array{url: string, name: string}>}
+     */
+    private function documentsPayload(?string $title, ?array $documents, string $fallbackTitle): array
+    {
+        $paths = collect($documents ?? [])
             ->filter(fn (mixed $path): bool => is_string($path) && $path !== '')
             ->values();
 
         return [
-            'title' => $this->privacy_policy_title ?: 'Политика конфиденциальности',
+            'title' => $title ?: $fallbackTitle,
             'documents' => $paths
                 ->map(function (string $path): array {
                     return [

@@ -54,6 +54,8 @@ class ManageSiteSettings extends Page
             'contacts_hours',
             'privacy_policy_title',
             'privacy_policy_documents',
+            'offer_title',
+            'offer_documents',
             'i18n',
         ]));
     }
@@ -136,6 +138,32 @@ class ManageSiteSettings extends Page
                             ])
                             ->disk('public')
                             ->directory('privacy-policy')
+                            ->visibility('public')
+                            ->maxSize(20480)
+                            ->columnSpanFull(),
+                    ])
+                    ->columns(2),
+                Section::make('Оферта')
+                    ->schema([
+                        TextInput::make('offer_title')
+                            ->label('Заголовок · RU')
+                            ->required()
+                            ->maxLength(150),
+                        ...LocalizedFields::text('offer_title', 'Заголовок', 150),
+                        FileUpload::make('offer_documents')
+                            ->label('Документы')
+                            ->helperText('PDF или Word. Можно несколько файлов — на фронте откроются по ссылке.')
+                            ->multiple()
+                            ->reorderable()
+                            ->downloadable()
+                            ->openable()
+                            ->acceptedFileTypes([
+                                'application/pdf',
+                                'application/msword',
+                                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                            ])
+                            ->disk('public')
+                            ->directory('offer')
                             ->visibility('public')
                             ->maxSize(20480)
                             ->columnSpanFull(),

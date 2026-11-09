@@ -107,7 +107,10 @@ class SiteSettingsApiTest extends TestCase
             ->assertJsonPath('contacts.phone', '+7 701 111 22 33')
             ->assertJsonPath('contacts.email', 'hello@haragun.kz')
             ->assertJsonPath('contacts.address', 'Алматы, Достык 240')
-            ->assertJsonStructure(['privacy_policy' => ['title', 'documents']]);
+            ->assertJsonStructure([
+                'privacy_policy' => ['title', 'documents'],
+                'offer' => ['title', 'documents'],
+            ]);
     }
 
     public function test_admin_can_save_site_settings(): void

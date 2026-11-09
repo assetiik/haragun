@@ -20,6 +20,7 @@ class ApiDocsTest extends TestCase
 
         $this->assertContains('/home', $paths);
         $this->assertContains('/privacy-policy', $paths);
+        $this->assertContains('/offer', $paths);
         $this->assertContains('/auth/send-code', $paths);
         $this->assertContains('/auth/verify-code', $paths);
         $this->assertContains('/establishments/{establishment}', $paths);

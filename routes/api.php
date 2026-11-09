@@ -11,6 +11,7 @@ use App\Http\Controllers\HeaderImageController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LocalizationController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\OfferController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\OrderFeedbackController;
 use App\Http\Controllers\OrderQuoteController;
@@ -26,6 +27,7 @@ Route::get('/localizations/{locale}', [LocalizationController::class, 'show'])->
 Route::get('/header-images', HeaderImageController::class)->name('api.header-images');
 Route::get('/promo-tiles', PromoTileController::class)->name('api.promo-tiles');
 Route::get('/privacy-policy', PrivacyPolicyController::class)->name('api.privacy-policy');
+Route::get('/offer', OfferController::class)->name('api.offer');
 Route::get('/brands/{brand}/addresses', [BrandAddressController::class, 'index'])
     ->name('api.brands.addresses.index');
 Route::get('/brands/{brand}/addresses/{establishment}', [BrandAddressController::class, 'show'])

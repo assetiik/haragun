@@ -23,10 +23,18 @@ final class SiteContent
     }
 
     /**
-     * @return array{title: string, text: ?string}
+     * @return array{title: string, documents: list<array{url: string, name: string}>}
      */
     public static function privacyPolicy(): array
     {
         return SiteSetting::current()->privacyPolicyPayload();
+    }
+
+    /**
+     * @return array{title: string, documents: list<array{url: string, name: string}>}
+     */
+    public static function offer(): array
+    {
+        return SiteSetting::current()->offerPayload();
     }
 }
