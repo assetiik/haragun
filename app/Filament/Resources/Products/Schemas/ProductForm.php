@@ -309,6 +309,14 @@ class ProductForm
                             ->visibility('public')
                             ->maxSize(10240)
                             ->columnSpanFull(),
+                        TextInput::make('iiko_product_id')
+                            ->label('iiko product ID')
+                            ->helperText('UUID блюда из номенклатуры iiko Cloud')
+                            ->maxLength(36)
+                            ->visible(fn ($livewire): bool => self::isCoffeeForm($livewire) || self::isMealsForm($livewire))
+                            ->columnSpan([
+                                'md' => 6,
+                            ]),
                         Select::make('modifiers')
                             ->label('Добавки')
                             ->relationship(

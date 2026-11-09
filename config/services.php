@@ -29,7 +29,16 @@ return [
     ],
 
     'otp' => [
-        'static_code' => env('OTP_STATIC_CODE', '1234'),
+        'static_code' => env('OTP_STATIC_CODE'),
+        'message' => env('OTP_SMS_MESSAGE', 'Ваш код для входа в Haragun: {code}'),
+    ],
+
+    'mobizon' => [
+        'api_key' => env('MOBIZON_API_KEY'),
+        'base_url' => env('MOBIZON_BASE_URL', 'https://api.mobizon.kz'),
+        'from' => env('MOBIZON_FROM', 'Haragun'),
+        'connect_timeout' => 3,
+        'timeout' => 10,
     ],
 
     'dss_soft' => [
@@ -41,6 +50,17 @@ return [
         'connect_timeout' => 3,
         'timeout' => 10,
         'entry_opens_minutes_before' => 60,
+    ],
+
+    'iiko' => [
+        'base_url' => env('IIKO_BASE_URL', 'https://api-ru.iiko.services'),
+        'api_login' => env('IIKO_API_LOGIN'),
+        'token_cache_key' => env('IIKO_TOKEN_CACHE_KEY', 'iiko.access_token'),
+        'token_ttl_seconds' => (int) env('IIKO_TOKEN_TTL_SECONDS', 3300),
+        'connect_timeout' => 3,
+        'timeout' => 15,
+        'command_poll_attempts' => (int) env('IIKO_COMMAND_POLL_ATTEMPTS', 10),
+        'command_poll_ms' => (int) env('IIKO_COMMAND_POLL_MS', 400),
     ],
 
     'fcm' => [

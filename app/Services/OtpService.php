@@ -3,22 +3,34 @@
 namespace App\Services;
 
 use App\Models\OtpCode;
+use App\Services\Mobizon\MobizonClient;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 
 class OtpService
 {
+    public function __construct(private MobizonClient $mobizon) {}
+
     public function send(string $phone): string
     {
         $plainCode = $this->plainCode();
+        $message = str_replace(
+            '{code}',
+            $plainCode,
+            (string) config('services.otp.message', 'Ваш код для входа в Haragun: {code}'),
+        );
+
+        if ($this->shouldSendSms()) {
+            $this->mobizon->sendSms($phone, $message);
+        } else {
+            Log::info("OTP for {$phone}: {$plainCode}");
+        }
 
         OtpCode::query()->create([
             'phone' => $phone,
             'code' => Hash::make($plainCode),
             'expires_at' => now()->addMinutes(5),
         ]);
-
-        Log::info("OTP for {$phone}: {$plainCode}");
 
         return $plainCode;
     }
@@ -41,6 +53,12 @@ class OtpService
         ]);
 
         return true;
+    }
+
+    private function shouldSendSms(): bool
+    {
+        return $this->mobizon->isConfigured()
+            && blank(config('services.otp.static_code'));
     }
 
     private function plainCode(): string

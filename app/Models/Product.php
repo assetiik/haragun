@@ -42,6 +42,7 @@ use Illuminate\Support\Carbon;
     'age_from',
     'is_active',
     'sort_order',
+    'iiko_product_id',
     'i18n',
 ])]
 class Product extends Model

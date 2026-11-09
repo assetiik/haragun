@@ -33,6 +33,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'dss_order_id',
     'dss_day_id',
     'dss_slot_id',
+    'iiko_order_id',
+    'iiko_correlation_id',
     'session_date',
     'session_time',
     'session_ends_at',

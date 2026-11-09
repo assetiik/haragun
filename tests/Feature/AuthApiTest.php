@@ -6,7 +6,9 @@ use App\Models\Order;
 use App\Models\OtpCode;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class AuthApiTest extends TestCase
@@ -32,6 +34,52 @@ class AuthApiTest extends TestCase
 
         $this->assertNotNull($otp);
         $this->assertTrue(Hash::check($response->json('debug_code'), $otp->code));
+    }
+
+    public function test_send_code_sends_sms_through_mobizon_when_configured(): void
+    {
+        config([
+            'services.otp.static_code' => null,
+            'services.otp.message' => 'Ваш код для входа в Haragun: {code}',
+            'services.mobizon.api_key' => 'test-mobizon-key',
+            'services.mobizon.base_url' => 'https://api.mobizon.kz',
+            'services.mobizon.from' => 'Haragun',
+        ]);
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://api.mobizon.kz/service/message/sendSmsMessage*' => Http::response([
+                'code' => 0,
+                'data' => [
+                    'campaignId' => 1,
+                    'messageId' => 2,
+                    'status' => 2,
+                ],
+                'message' => '',
+            ]),
+        ]);
+
+        $response = $this->postJson('/api/auth/send-code', [
+            'phone' => '77784046889',
+        ]);
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('sent', true)
+            ->assertJsonStructure(['debug_code']);
+
+        $debugCode = $response->json('debug_code');
+
+        $this->assertMatchesRegularExpression('/^\d{4}$/', (string) $debugCode);
+
+        Http::assertSent(function (Request $request) use ($debugCode): bool {
+            parse_str((string) $request->body(), $body);
+
+            return str_starts_with($request->url(), 'https://api.mobizon.kz/service/message/sendSmsMessage')
+                && ($body['recipient'] ?? null) === '77784046889'
+                && ($body['from'] ?? null) === 'Haragun'
+                && ($body['text'] ?? null) === "Ваш код для входа в Haragun: {$debugCode}";
+        });
     }
 
     public function test_send_code_rejects_invalid_phone(): void

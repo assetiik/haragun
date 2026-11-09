@@ -39,6 +39,10 @@ use Illuminate\Support\Carbon;
     'booking_days_ahead',
     'is_active',
     'sort_order',
+    'iiko_organization_id',
+    'iiko_terminal_group_id',
+    'iiko_table_id',
+    'iiko_payment_type_id',
     'i18n',
 ])]
 class Establishment extends Model

@@ -11,6 +11,7 @@ use App\Models\OrderItem;
 use App\Models\User;
 use App\Services\DssSoft\DssSoftCatalog;
 use App\Services\DssSoft\DssSoftClient;
+use App\Services\Iiko\IikoCatalog;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -22,6 +23,7 @@ class OrderService
         private OrderQuoteService $quotes,
         private DssSoftCatalog $dss,
         private DssSoftClient $dssClient,
+        private IikoCatalog $iiko,
     ) {}
 
     /**
@@ -114,6 +116,14 @@ class OrderService
                 $this->attachBarcodes($order, $dssOrder, $ticketLines->all());
             }
 
+            if ($type === OrderType::Venue && $this->iiko->usesIiko($establishment)) {
+                $iikoOrder = $this->iiko->createVenueOrder($order, $user, $quote['lines']);
+                $order->forceFill([
+                    'iiko_order_id' => $iikoOrder['orderId'],
+                    'iiko_correlation_id' => $iikoOrder['correlationId'] ?: null,
+                ])->save();
+            }
+
             return $order->load(['items', 'establishment']);
         } catch (Throwable $exception) {
             if (! $confirmed && is_array($dssHold) && isset($dssHold['id'])) {
@@ -127,6 +137,13 @@ class OrderService
                 }
 
                 $order?->delete();
+            } elseif (
+                $order !== null
+                && $type === OrderType::Venue
+                && $this->iiko->usesIiko($establishment)
+                && blank($order->iiko_order_id)
+            ) {
+                $order->delete();
             }
 
             throw $exception;

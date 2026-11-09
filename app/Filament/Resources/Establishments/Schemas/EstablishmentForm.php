@@ -169,6 +169,43 @@ class EstablishmentForm
                         'default' => 1,
                         'md' => 12,
                     ]),
+                Section::make('iiko')
+                    ->description('Cloud API: organization, terminal group, стол и тип оплаты для заказов из приложения')
+                    ->columnSpanFull()
+                    ->visible(fn (): bool => VenueSection::type() === null || VenueSection::type() === EstablishmentType::Coffee)
+                    ->collapsed()
+                    ->schema([
+                        TextInput::make('iiko_organization_id')
+                            ->label('Organization ID')
+                            ->maxLength(36)
+                            ->columnSpan([
+                                'md' => 6,
+                            ]),
+                        TextInput::make('iiko_terminal_group_id')
+                            ->label('Terminal group ID')
+                            ->maxLength(36)
+                            ->columnSpan([
+                                'md' => 6,
+                            ]),
+                        TextInput::make('iiko_table_id')
+                            ->label('Table ID')
+                            ->helperText('Стол под заказы из приложения (order/create)')
+                            ->maxLength(36)
+                            ->columnSpan([
+                                'md' => 6,
+                            ]),
+                        TextInput::make('iiko_payment_type_id')
+                            ->label('Payment type ID')
+                            ->helperText('Опционально: тип оплаты «уже оплачено» / External')
+                            ->maxLength(36)
+                            ->columnSpan([
+                                'md' => 6,
+                            ]),
+                    ])
+                    ->columns([
+                        'default' => 1,
+                        'md' => 12,
+                    ]),
             ]);
     }
 }
