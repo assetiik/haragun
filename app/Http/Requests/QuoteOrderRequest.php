@@ -20,6 +20,7 @@ class QuoteOrderRequest extends FormRequest
             'establishment_id' => ['required', 'integer', 'exists:establishments,id'],
             'date' => ['required', 'date_format:Y-m-d'],
             'time' => ['required', 'date_format:H:i'],
+            'promo_code' => ['nullable', 'string', 'max:64'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
             'items.*.quantity' => ['nullable', 'integer', 'min:1', 'max:20'],

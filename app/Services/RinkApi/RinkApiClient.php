@@ -101,6 +101,34 @@ class RinkApiClient
     }
 
     /**
+     * @return array<string, mixed>
+     */
+    public function promoCode(string $code, int $sessionId): array
+    {
+        return $this->jsonObject($this->send('GET', '/promo-codes/'.rawurlencode($code), [
+            'session_id' => $sessionId,
+        ]));
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function refundTicket(string $code, array $payload = []): array
+    {
+        return $this->jsonObject($this->send('POST', "/tickets/{$code}/refund", $payload));
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function moveTicket(string $code, array $payload): array
+    {
+        return $this->jsonObject($this->send('POST', "/tickets/{$code}/move", $payload));
+    }
+
+    /**
      * @param  array<string, mixed>  $queryOrBody
      */
     private function send(string $method, string $path, array $queryOrBody = []): Response

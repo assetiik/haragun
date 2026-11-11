@@ -36,7 +36,8 @@ class OrderService
      *     date: string,
      *     time: string,
      *     items: list<array{product_id: int, quantity?: int, sizes?: list<int>}>,
-     *     payment_label?: string
+     *     payment_label?: string,
+     *     promo_code?: string|null
      * }  $payload
      */
     public function create(User $user, array $payload): Order
@@ -57,7 +58,11 @@ class OrderService
         try {
             if ($type === OrderType::Tickets && $this->rink->usesRink($establishment) && $ticketLines->isNotEmpty()) {
                 $session = $this->rink->resolveSession($payload['date'], $payload['time']);
-                $rinkHold = $this->rinkClient->createOrder($this->rinkOrderPayload($ticketLines->all(), $session));
+                $rinkHold = $this->rinkClient->createOrder($this->rinkOrderPayload(
+                    $ticketLines->all(),
+                    $session,
+                    $quote['promo_code'] ?? null,
+                ));
             } elseif ($type === OrderType::Tickets && $this->dss->usesDss($establishment) && $ticketLines->isNotEmpty()) {
                 $slot = $this->dss->resolveSlot($payload['date'], $payload['time']);
                 $dssHold = $this->dssClient->createOrder($this->dssOrderPayload($user, $ticketLines->all(), $slot));
@@ -94,6 +99,8 @@ class OrderService
                     'summary_title' => $this->summaryTitle($quote['lines']),
                     'summary_short' => $this->summaryShort($quote['lines']),
                     'payment_label' => $payload['payment_label'] ?? 'Kaspi Gold · 4417',
+                    'promo_code' => $quote['promo_code'] ?? null,
+                    'promo_discount' => (int) ($quote['promo_discount'] ?? 0),
                     'points_to_earn' => (int) floor($quote['total'] / 20),
                     'prep_minutes' => $type === OrderType::Venue ? 5 : null,
                     'paid_at' => $now,
@@ -185,7 +192,7 @@ class OrderService
      * @param  array{rink_session_id: int}  $session
      * @return array<string, mixed>
      */
-    private function rinkOrderPayload(array $ticketLines, array $session): array
+    private function rinkOrderPayload(array $ticketLines, array $session, ?string $promoCode = null): array
     {
         $items = [];
         $expectedTotal = 0;
@@ -207,13 +214,19 @@ class OrderService
             $expectedTotal += $quantity * $unitPrice;
         }
 
-        return [
+        $payload = [
             'session_id' => $session['rink_session_id'],
             'external_order_id' => 'APP-'.Str::lower((string) Str::ulid()),
             'sale_kind' => (string) config('services.rink_api.sale_kind', 'online'),
             'items' => $items,
             'expected_total' => $expectedTotal,
         ];
+
+        if (filled($promoCode)) {
+            $payload['promo_code'] = $promoCode;
+        }
+
+        return $payload;
     }
 
     /**

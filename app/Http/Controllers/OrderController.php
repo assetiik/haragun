@@ -7,6 +7,7 @@ use App\Http\Requests\StoreOrderRequest;
 use App\Http\Resources\OrderDetailResource;
 use App\Http\Resources\OrderListResource;
 use App\Models\Order;
+use App\Services\IceTicketService;
 use App\Services\OrderService;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
@@ -15,7 +16,10 @@ use Illuminate\Http\Request;
 #[Group('Orders', weight: 7)]
 class OrderController extends Controller
 {
-    public function __construct(private OrderService $orders) {}
+    public function __construct(
+        private OrderService $orders,
+        private IceTicketService $iceTickets,
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -71,6 +75,7 @@ class OrderController extends Controller
     public function store(StoreOrderRequest $request): JsonResponse
     {
         $order = $this->orders->create($request->user(), $request->validated());
+        $request->attributes->set('rink_tickets', $this->iceTickets->remoteTicketsByCode($order));
 
         return response()->json([
             'order' => new OrderDetailResource($order),
@@ -82,6 +87,7 @@ class OrderController extends Controller
         abort_unless($order->user_id === $request->user()->id, 404);
 
         $order->load(['establishment', 'items.product', 'feedback']);
+        $request->attributes->set('rink_tickets', $this->iceTickets->remoteTicketsByCode($order));
 
         return new OrderDetailResource($order);
     }

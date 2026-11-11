@@ -23,6 +23,7 @@ class OrderQuoteService
      *     establishment_id: int,
      *     date: string,
      *     time: string,
+     *     promo_code?: string|null,
      *     items: list<array{product_id: int, quantity?: int, sizes?: list<int>}>
      * }  $payload
      * @return array<string, mixed>
@@ -35,6 +36,15 @@ class OrderQuoteService
 
         $date = Carbon::parse($payload['date'])->startOfDay();
         $time = $payload['time'];
+        $promoCode = filled($payload['promo_code'] ?? null)
+            ? trim((string) $payload['promo_code'])
+            : null;
+
+        if ($promoCode !== null && ! $this->rink->usesRink($establishment)) {
+            throw ValidationException::withMessages([
+                'promo_code' => ['Промокоды доступны только для билетов новой системы.'],
+            ]);
+        }
 
         $products = Product::query()
             ->with('skateSizes')
@@ -55,7 +65,26 @@ class OrderQuoteService
                 ]);
             }
 
-            $lines->push($this->buildLine($product, $item, $establishment, $date, $time));
+            $lines->push($this->buildLine($product, $item, $establishment, $date, $time, $promoCode));
+        }
+
+        $promo = null;
+        $promoDiscount = 0;
+
+        if ($promoCode !== null) {
+            $session = $this->rink->resolveSession($date->toDateString(), $time);
+            $promo = $this->rink->promoPrices($promoCode, $session['rink_session_id']);
+            $promoDiscount = $lines
+                ->filter(fn (array $line): bool => ($line['kind'] ?? null) === ProductKind::Ticket->value)
+                ->sum(fn (array $line): int => max(0, ((int) ($line['full_price'] ?? $line['unit_price'])) - (int) $line['unit_price']) * (int) $line['quantity']);
+
+            if ($promoDiscount < 1) {
+                throw ValidationException::withMessages([
+                    'promo_code' => ['Промокод не действует ни на один билет в этом заказе.'],
+                ]);
+            }
+
+            $promo['discount'] = $promoDiscount;
         }
 
         $discountLines = $this->discounts($lines, $date);
@@ -76,6 +105,9 @@ class OrderQuoteService
                 'date' => $date->toDateString(),
                 'time' => $time,
             ],
+            'promo' => $promo,
+            'promo_code' => $promo['code'] ?? null,
+            'promo_discount' => $promoDiscount,
             'lines' => $allLines->values()->all(),
             'receipt_groups' => $this->receiptGroups($lines, $discountLines),
             'items_count' => $itemsCount,
@@ -89,8 +121,14 @@ class OrderQuoteService
      * @param  array{product_id: int, quantity?: int, sizes?: list<int>}  $item
      * @return array<string, mixed>
      */
-    private function buildLine(Product $product, array $item, Establishment $establishment, Carbon $date, string $time): array
-    {
+    private function buildLine(
+        Product $product,
+        array $item,
+        Establishment $establishment,
+        Carbon $date,
+        string $time,
+        ?string $promoCode,
+    ): array {
         if ($product->kind === ProductKind::RentalSkates) {
             $sizes = collect($item['sizes'] ?? [])->map(fn ($size) => (int) $size)->values();
 
@@ -131,11 +169,12 @@ class OrderQuoteService
 
         $quantity = max(1, (int) ($item['quantity'] ?? 1));
         $unitPrice = $product->priceOn($date);
+        $fullPrice = $unitPrice;
         $priceGroupId = null;
         $ticketType = null;
 
         if ($product->kind === ProductKind::Ticket && $this->rink->usesRink($establishment)) {
-            $price = $this->rink->priceFor($product, $date->toDateString(), $time);
+            $price = $this->rink->priceFor($product, $date->toDateString(), $time, $promoCode);
 
             if ($price === null) {
                 throw ValidationException::withMessages([
@@ -144,6 +183,7 @@ class OrderQuoteService
             }
 
             $unitPrice = $price['price'];
+            $fullPrice = $price['full_price'];
             $ticketType = $price['ticket_type'];
         } elseif ($product->kind === ProductKind::Ticket && $this->dss->usesDss($establishment)) {
             $group = $this->dss->priceGroupFor($product, $date->toDateString(), $time);
@@ -155,6 +195,7 @@ class OrderQuoteService
             }
 
             $unitPrice = $group['price'];
+            $fullPrice = $group['price'];
             $priceGroupId = $group['id'];
         }
 
@@ -166,6 +207,7 @@ class OrderQuoteService
             'name' => $product->name,
             'quantity' => $quantity,
             'unit_price' => $unitPrice,
+            'full_price' => $fullPrice,
             'amount' => $amount,
             'sizes' => [],
             'is_discount' => false,
@@ -197,7 +239,6 @@ class OrderQuoteService
                 'is_discount' => true,
             ]);
         } elseif ($skates && $skates['quantity'] >= 2) {
-            // weekend promo from first mock: one pair discounted when multiple pairs
             $amount = -1 * (int) $skates['unit_price'];
             $discounts->push([
                 'product_id' => null,

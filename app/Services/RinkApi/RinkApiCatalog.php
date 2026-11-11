@@ -199,9 +199,9 @@ class RinkApiCatalog
     }
 
     /**
-     * @return array{ticket_type: string, price: int}|null
+     * @return array{ticket_type: string, price: int, full_price: int, discounted: bool}|null
      */
-    public function priceFor(Product $product, string $date, string $time): ?array
+    public function priceFor(Product $product, string $date, string $time, ?string $promoCode = null): ?array
     {
         if ($product->kind !== ProductKind::Ticket || blank($product->ticket_type)) {
             return null;
@@ -209,17 +209,80 @@ class RinkApiCatalog
 
         $session = $this->resolveSession($date, $time);
         $ticketType = (string) $product->ticket_type;
+        $prices = $session['prices'];
 
-        foreach ($session['prices'] as $price) {
-            if ($price['ticket_type'] === $ticketType) {
-                return [
-                    'ticket_type' => $ticketType,
-                    'price' => $price['price'],
-                ];
+        if (filled($promoCode)) {
+            $promo = $this->promoPrices($promoCode, $session['rink_session_id']);
+            $prices = $promo['prices'];
+        }
+
+        foreach ($prices as $price) {
+            if (($price['ticket_type'] ?? null) !== $ticketType) {
+                continue;
             }
+
+            $unit = (int) ($price['price'] ?? 0);
+            $full = (int) ($price['full_price'] ?? $unit);
+
+            return [
+                'ticket_type' => $ticketType,
+                'price' => $unit,
+                'full_price' => $full,
+                'discounted' => (bool) ($price['discounted'] ?? $full > $unit),
+            ];
         }
 
         return null;
+    }
+
+    /**
+     * @return array{
+     *     code: string,
+     *     name: string|null,
+     *     kind: string|null,
+     *     value: int|null,
+     *     remaining: int|null,
+     *     session_id: int,
+     *     prices: list<array{ticket_type: string, name: mixed, full_price: int, price: int, discounted: bool}>
+     * }
+     */
+    public function promoPrices(string $code, int $sessionId): array
+    {
+        $key = 'promo:'.mb_strtolower(trim($code)).':'.$sessionId;
+
+        return $this->remember($key, function () use ($code, $sessionId): array {
+            $payload = $this->client->promoCode($code, $sessionId);
+            $prices = [];
+
+            foreach ($payload['prices'] ?? [] as $price) {
+                if (! is_array($price) || blank($price['ticket_type'] ?? null)) {
+                    continue;
+                }
+
+                $unit = (int) ($price['price'] ?? 0);
+                $full = (int) ($price['full_price'] ?? $unit);
+
+                $prices[] = [
+                    'ticket_type' => (string) $price['ticket_type'],
+                    'name' => $price['name'] ?? null,
+                    'full_price' => $full,
+                    'price' => $unit,
+                    'discounted' => (bool) ($price['discounted'] ?? $full > $unit),
+                ];
+            }
+
+            return [
+                'code' => (string) ($payload['code'] ?? $code),
+                'name' => isset($payload['name']) ? (string) $payload['name'] : null,
+                'kind' => isset($payload['kind']) ? (string) $payload['kind'] : null,
+                'value' => isset($payload['value']) ? (int) $payload['value'] : null,
+                'remaining' => array_key_exists('remaining', $payload) && $payload['remaining'] !== null
+                    ? (int) $payload['remaining']
+                    : null,
+                'session_id' => $sessionId,
+                'prices' => $prices,
+            ];
+        });
     }
 
     /**

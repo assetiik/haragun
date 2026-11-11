@@ -9,6 +9,7 @@ use App\Http\Controllers\FavoriteController;
 use App\Http\Controllers\FoodCourtController;
 use App\Http\Controllers\HeaderImageController;
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\IceTicketController;
 use App\Http\Controllers\LocalizationController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OfferController;
@@ -48,6 +49,8 @@ Route::post('/establishments/{establishment}/menu/quote', [CoffeeMenuController:
     ->name('api.establishments.menu.quote');
 Route::post('/orders/quote', OrderQuoteController::class)
     ->name('api.orders.quote');
+Route::get('/establishments/{establishment}/promo-codes/{code}', [IceTicketController::class, 'previewPromo'])
+    ->name('api.establishments.promo-codes.show');
 
 Route::prefix('auth')->group(function () {
     Route::post('/send-code', [AuthController::class, 'sendCode'])
@@ -102,4 +105,9 @@ Route::middleware('auth:sanctum')->group(function () {
         ->name('api.orders.coffee-screen');
     Route::post('/orders/{order}/feedback', [OrderFeedbackController::class, 'store'])
         ->name('api.orders.feedback');
+
+    Route::post('/orders/{order}/passes/{barcode}/refund', [IceTicketController::class, 'refund'])
+        ->name('api.orders.passes.refund');
+    Route::post('/orders/{order}/passes/{barcode}/move', [IceTicketController::class, 'move'])
+        ->name('api.orders.passes.move');
 });
