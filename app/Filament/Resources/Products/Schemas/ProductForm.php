@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Products\Schemas;
 
 use App\Enums\EstablishmentType;
+use App\Enums\ProductKind;
 use App\Filament\Support\LocalizedFields;
 use App\Filament\Support\VenueSection;
 use App\Models\Establishment;
@@ -130,6 +131,15 @@ class ProductForm
                         Select::make('kind')
                             ->hidden()
                             ->dehydrated(false),
+                        TextInput::make('ticket_type')
+                            ->label('Код типа билета (API)')
+                            ->maxLength(64)
+                            ->helperText('Например: adult, child, student. Нужен для новой билетной системы.')
+                            ->visible(fn ($livewire): bool => self::isIceTicketForm($livewire))
+                            ->dehydrated(fn ($livewire): bool => self::isIceTicketForm($livewire))
+                            ->columnSpan([
+                                'md' => 6,
+                            ]),
                         TextInput::make('food_section')
                             ->label('Секция')
                             ->maxLength(120)
@@ -474,6 +484,23 @@ class ProductForm
             $livewire->record ?? null,
             $livewire->venueTab ?? null,
         );
+    }
+
+    private static function isIceTicketForm(object $livewire): bool
+    {
+        if (self::isCoffeeForm($livewire) || self::isMealsForm($livewire) || self::isSkateForm($livewire)) {
+            return false;
+        }
+
+        $tab = $livewire->venueTab ?? VenueSection::fromRequest();
+
+        if ($tab === VenueSection::Haragun) {
+            return true;
+        }
+
+        $record = $livewire->record ?? null;
+
+        return $record instanceof Product && $record->kind === ProductKind::Ticket;
     }
 
     private static function usesDayPrice(object $livewire, Get $get): bool

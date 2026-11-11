@@ -12,6 +12,8 @@ use App\Models\User;
 use App\Services\DssSoft\DssSoftCatalog;
 use App\Services\DssSoft\DssSoftClient;
 use App\Services\Iiko\IikoCatalog;
+use App\Services\RinkApi\RinkApiCatalog;
+use App\Services\RinkApi\RinkApiClient;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -23,6 +25,8 @@ class OrderService
         private OrderQuoteService $quotes,
         private DssSoftCatalog $dss,
         private DssSoftClient $dssClient,
+        private RinkApiCatalog $rink,
+        private RinkApiClient $rinkClient,
         private IikoCatalog $iiko,
     ) {}
 
@@ -44,20 +48,26 @@ class OrderService
             ->filter(fn (array $line): bool => $line['kind'] === ProductKind::Ticket->value && ! $line['is_discount']);
 
         $slot = null;
+        $session = null;
         $dssHold = null;
+        $rinkHold = null;
         $order = null;
         $confirmed = false;
 
         try {
-            if ($type === OrderType::Tickets && $this->dss->usesDss($establishment) && $ticketLines->isNotEmpty()) {
+            if ($type === OrderType::Tickets && $this->rink->usesRink($establishment) && $ticketLines->isNotEmpty()) {
+                $session = $this->rink->resolveSession($payload['date'], $payload['time']);
+                $rinkHold = $this->rinkClient->createOrder($this->rinkOrderPayload($ticketLines->all(), $session));
+            } elseif ($type === OrderType::Tickets && $this->dss->usesDss($establishment) && $ticketLines->isNotEmpty()) {
                 $slot = $this->dss->resolveSlot($payload['date'], $payload['time']);
                 $dssHold = $this->dssClient->createOrder($this->dssOrderPayload($user, $ticketLines->all(), $slot));
             }
 
-            $order = DB::transaction(function () use ($user, $payload, $quote, $type, $slot, $dssHold) {
+            $order = DB::transaction(function () use ($user, $payload, $quote, $type, $slot, $session, $dssHold, $rinkHold) {
                 $number = $this->nextNumber();
                 $now = now();
-                $sessionEnds = $slot['ends_at'] ?? $this->sessionEndsAt($payload['time']);
+                $sessionEnds = $session['ends_at'] ?? $slot['ends_at'] ?? $this->sessionEndsAt($payload['time']);
+                $entryOpens = $session['entry_opens_at'] ?? null;
 
                 $order = Order::query()->create([
                     'user_id' => $user->id,
@@ -69,9 +79,14 @@ class OrderService
                     'dss_order_id' => $dssHold['id'] ?? null,
                     'dss_day_id' => $slot['dss_day_id'] ?? null,
                     'dss_slot_id' => $slot['dss_slot_id'] ?? null,
+                    'rink_order_id' => $rinkHold['order_id'] ?? null,
+                    'rink_session_id' => $session['rink_session_id'] ?? null,
                     'session_date' => $payload['date'],
                     'session_time' => $payload['time'].':00',
                     'session_ends_at' => strlen($sessionEnds) === 5 ? $sessionEnds.':00' : $sessionEnds,
+                    'session_entry_opens_at' => is_string($entryOpens) && strlen($entryOpens) === 5
+                        ? $entryOpens.':00'
+                        : null,
                     'subtotal' => $quote['subtotal'],
                     'discount_total' => $quote['discount_total'],
                     'total' => $quote['total'],
@@ -110,7 +125,11 @@ class OrderService
                 return $order;
             });
 
-            if (is_array($dssHold) && isset($dssHold['id'])) {
+            if (is_array($rinkHold) && isset($rinkHold['order_id'])) {
+                $confirmedOrder = $this->rinkClient->confirmOrder((string) $rinkHold['order_id']);
+                $confirmed = true;
+                $this->attachRinkBarcodes($order, $confirmedOrder, $ticketLines->all());
+            } elseif (is_array($dssHold) && isset($dssHold['id'])) {
                 $dssOrder = $this->dssClient->confirmOrder((int) $dssHold['id']);
                 $confirmed = true;
                 $this->attachBarcodes($order, $dssOrder, $ticketLines->all());
@@ -126,7 +145,18 @@ class OrderService
 
             return $order->load(['items', 'establishment']);
         } catch (Throwable $exception) {
-            if (! $confirmed && is_array($dssHold) && isset($dssHold['id'])) {
+            if (! $confirmed && is_array($rinkHold) && isset($rinkHold['order_id'])) {
+                try {
+                    $this->rinkClient->releaseOrder((string) $rinkHold['order_id']);
+                } catch (Throwable $releaseException) {
+                    Log::warning('Не удалось отменить бронь Rink API', [
+                        'rink_order_id' => $rinkHold['order_id'],
+                        'error' => $releaseException->getMessage(),
+                    ]);
+                }
+
+                $order?->delete();
+            } elseif (! $confirmed && is_array($dssHold) && isset($dssHold['id'])) {
                 try {
                     $this->dssClient->cancelOrder((int) $dssHold['id']);
                 } catch (Throwable $cancelException) {
@@ -147,6 +177,81 @@ class OrderService
             }
 
             throw $exception;
+        }
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $ticketLines
+     * @param  array{rink_session_id: int}  $session
+     * @return array<string, mixed>
+     */
+    private function rinkOrderPayload(array $ticketLines, array $session): array
+    {
+        $items = [];
+        $expectedTotal = 0;
+
+        foreach ($ticketLines as $line) {
+            $ticketType = (string) ($line['ticket_type'] ?? '');
+            $quantity = (int) $line['quantity'];
+            $unitPrice = (int) $line['unit_price'];
+
+            if ($ticketType === '' || $quantity < 1) {
+                continue;
+            }
+
+            $items[] = [
+                'ticket_type' => $ticketType,
+                'quantity' => $quantity,
+                'unit_price' => $unitPrice,
+            ];
+            $expectedTotal += $quantity * $unitPrice;
+        }
+
+        return [
+            'session_id' => $session['rink_session_id'],
+            'external_order_id' => 'APP-'.Str::lower((string) Str::ulid()),
+            'sale_kind' => (string) config('services.rink_api.sale_kind', 'online'),
+            'items' => $items,
+            'expected_total' => $expectedTotal,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $rinkOrder
+     * @param  list<array<string, mixed>>  $ticketLines
+     */
+    private function attachRinkBarcodes(Order $order, array $rinkOrder, array $ticketLines): void
+    {
+        $byType = collect($rinkOrder['tickets'] ?? [])
+            ->groupBy(fn (mixed $item): string => (string) data_get($item, 'ticket_type', ''))
+            ->map(fn ($items) => collect($items)
+                ->map(fn (mixed $item): string => (string) data_get($item, 'code', ''))
+                ->filter()
+                ->values());
+
+        $available = $byType->flatten()->values();
+
+        foreach ($order->items()->get() as $item) {
+            if ($item->kind !== ProductKind::Ticket->value || $item->is_discount) {
+                continue;
+            }
+
+            $line = collect($ticketLines)->firstWhere('product_id', $item->product_id);
+            $ticketType = (string) ($line['ticket_type'] ?? '');
+            $needed = (int) $item->quantity;
+            $codes = [];
+
+            if ($ticketType !== '' && $byType->has($ticketType)) {
+                $codes = $byType[$ticketType]->splice(0, $needed)->all();
+            }
+
+            if ($codes === []) {
+                $codes = $available->splice(0, $needed)->all();
+            }
+
+            $item->update([
+                'barcodes' => $codes === [] ? null : array_values($codes),
+            ]);
         }
     }
 

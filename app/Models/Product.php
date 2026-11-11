@@ -25,6 +25,7 @@ use Illuminate\Support\Carbon;
     'brand_id',
     'menu_category_id',
     'kind',
+    'ticket_type',
     'requires_size',
     'size_min',
     'size_max',

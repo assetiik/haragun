@@ -4,6 +4,8 @@ namespace App\Providers;
 
 use App\Services\DssSoft\DssSoftCatalog;
 use App\Services\DssSoft\DssSoftClient;
+use App\Services\RinkApi\RinkApiCatalog;
+use App\Services\RinkApi\RinkApiClient;
 use Filament\Tables\Table;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\Gate;
@@ -18,6 +20,8 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->singleton(DssSoftClient::class);
         $this->app->singleton(DssSoftCatalog::class);
+        $this->app->singleton(RinkApiClient::class);
+        $this->app->singleton(RinkApiCatalog::class);
     }
 
     /**

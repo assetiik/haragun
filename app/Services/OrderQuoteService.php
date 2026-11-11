@@ -6,13 +6,17 @@ use App\Enums\ProductKind;
 use App\Models\Establishment;
 use App\Models\Product;
 use App\Services\DssSoft\DssSoftCatalog;
+use App\Services\RinkApi\RinkApiCatalog;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
 class OrderQuoteService
 {
-    public function __construct(private DssSoftCatalog $dss) {}
+    public function __construct(
+        private DssSoftCatalog $dss,
+        private RinkApiCatalog $rink,
+    ) {}
 
     /**
      * @param  array{
@@ -128,8 +132,20 @@ class OrderQuoteService
         $quantity = max(1, (int) ($item['quantity'] ?? 1));
         $unitPrice = $product->priceOn($date);
         $priceGroupId = null;
+        $ticketType = null;
 
-        if ($product->kind === ProductKind::Ticket && $this->dss->usesDss($establishment)) {
+        if ($product->kind === ProductKind::Ticket && $this->rink->usesRink($establishment)) {
+            $price = $this->rink->priceFor($product, $date->toDateString(), $time);
+
+            if ($price === null) {
+                throw ValidationException::withMessages([
+                    'items' => ["«{$product->name}» не продаётся на этот сеанс."],
+                ]);
+            }
+
+            $unitPrice = $price['price'];
+            $ticketType = $price['ticket_type'];
+        } elseif ($product->kind === ProductKind::Ticket && $this->dss->usesDss($establishment)) {
             $group = $this->dss->priceGroupFor($product, $date->toDateString(), $time);
 
             if ($group === null || $group['id'] === 0) {
@@ -154,6 +170,7 @@ class OrderQuoteService
             'sizes' => [],
             'is_discount' => false,
             'dss_pricegroup_id' => $priceGroupId,
+            'ticket_type' => $ticketType,
         ];
     }
 

@@ -26,7 +26,9 @@ class DssSoftCatalog
 
     public function usesDss(Establishment $establishment): bool
     {
-        return $this->enabled() && $establishment->type === EstablishmentType::IceArena;
+        return config('services.ticket_provider', 'dss_soft') === 'dss_soft'
+            && $this->enabled()
+            && $establishment->type === EstablishmentType::IceArena;
     }
 
     /**

@@ -33,11 +33,14 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'dss_order_id',
     'dss_day_id',
     'dss_slot_id',
+    'rink_order_id',
+    'rink_session_id',
     'iiko_order_id',
     'iiko_correlation_id',
     'session_date',
     'session_time',
     'session_ends_at',
+    'session_entry_opens_at',
     'subtotal',
     'discount_total',
     'total',
@@ -86,6 +89,7 @@ class Order extends Model
             'dss_order_id' => 'integer',
             'dss_day_id' => 'integer',
             'dss_slot_id' => 'integer',
+            'rink_session_id' => 'integer',
             'number' => 'integer',
             'guest_number' => 'integer',
             'subtotal' => 'integer',
@@ -372,6 +376,12 @@ class Order extends Model
 
     public function passOpensAt(): ?CarbonInterface
     {
+        if ($this->session_date !== null && $this->session_entry_opens_at !== null) {
+            $time = substr((string) $this->session_entry_opens_at, 0, 5);
+
+            return Carbon::parse($this->session_date->toDateString().' '.$time);
+        }
+
         $start = $this->sessionStartsAt();
 
         if ($start === null) {

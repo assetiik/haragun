@@ -41,6 +41,12 @@ return [
         'timeout' => 10,
     ],
 
+    /*
+    | Ticket provider for ice-arena sessions: dss_soft (current) or rink_api (new).
+    | Keep dss_soft until rink_api is verified on staging.
+    */
+    'ticket_provider' => env('TICKET_PROVIDER', 'dss_soft'),
+
     'dss_soft' => [
         'base_url' => env('DSS_SOFT_BASE_URL', 'https://api.dss-soft.kz'),
         'token' => env('DSS_SOFT_PARTNER_TOKEN'),
@@ -50,6 +56,14 @@ return [
         'connect_timeout' => 3,
         'timeout' => 10,
         'entry_opens_minutes_before' => 60,
+    ],
+
+    'rink_api' => [
+        'base_url' => env('RINK_API_BASE_URL', 'https://178-62-199-193.sslip.io/api/v1'),
+        'api_key' => env('RINK_API_KEY'),
+        'sale_kind' => env('RINK_API_SALE_KIND', 'online'),
+        'connect_timeout' => 3,
+        'timeout' => 15,
     ],
 
     'iiko' => [

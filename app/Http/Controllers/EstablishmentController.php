@@ -11,6 +11,7 @@ use App\Models\MenuCategory;
 use App\Models\Product;
 use App\Services\DssSoft\DssSoftCatalog;
 use App\Services\EstablishmentBookingService;
+use App\Services\RinkApi\RinkApiCatalog;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -22,6 +23,7 @@ class EstablishmentController extends Controller
     public function __construct(
         private EstablishmentBookingService $booking,
         private DssSoftCatalog $dss,
+        private RinkApiCatalog $rink,
     ) {}
 
     public function show(Request $request, Establishment $establishment): JsonResponse
@@ -54,7 +56,11 @@ class EstablishmentController extends Controller
         $slots = [];
 
         if ($selectedCategory?->requires_booking) {
-            if ($this->dss->usesDss($establishment)) {
+            if ($this->rink->usesRink($establishment)) {
+                $dates = $this->rink->dates();
+                $selectedDate = $this->rink->resolveDate($validated['date'] ?? null);
+                $slots = $selectedDate === null ? [] : $this->rink->slots($selectedDate);
+            } elseif ($this->dss->usesDss($establishment)) {
                 $dates = $this->dss->dates();
                 $selectedDate = $this->dss->resolveDate($validated['date'] ?? null);
                 $slots = $selectedDate === null ? [] : $this->dss->slots($selectedDate);
@@ -84,7 +90,9 @@ class EstablishmentController extends Controller
             } else {
                 $products = $selectedCategory->products()->tickets()->active()->ordered()->get();
 
-                if ($this->dss->usesDss($establishment) && $selectedDate !== null && isset($validated['time'])) {
+                if ($this->rink->usesRink($establishment) && $selectedDate !== null && isset($validated['time'])) {
+                    $products = $this->rink->applyPrices($products, $selectedDate, $validated['time']);
+                } elseif ($this->dss->usesDss($establishment) && $selectedDate !== null && isset($validated['time'])) {
                     $products = $this->dss->applyPrices($products, $selectedDate, $validated['time']);
                 }
             }
