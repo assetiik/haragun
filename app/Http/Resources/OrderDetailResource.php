@@ -6,6 +6,7 @@ use App\Enums\OrderType;
 use App\Enums\ProductKind;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Services\TipTopPay\TipTopPayService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Carbon;
@@ -57,6 +58,9 @@ class OrderDetailResource extends JsonResource
             'items' => OrderItemResource::collection($productItems),
             'discounts' => OrderItemResource::collection($this->items->where('is_discount', true)->values()),
             'payment_label' => $this->payment_label,
+            'payment_status' => $this->payment_status?->value ?? 'paid',
+            'payment_provider' => $this->payment_provider,
+            'payment' => app(TipTopPayService::class)->paymentPayload($this->resource),
             'promo_code' => $this->promo_code,
             'promo_discount' => (int) ($this->promo_discount ?? 0),
             'points_to_earn' => $this->points_to_earn,

@@ -77,6 +77,15 @@ return [
         'command_poll_ms' => (int) env('IIKO_COMMAND_POLL_MS', 400),
     ],
 
+    'tiptop_pay' => [
+        'enabled' => (bool) env('TIPTOP_PAY_ENABLED', false),
+        'base_url' => env('TIPTOP_PAY_BASE_URL', 'https://api.tiptoppay.kz'),
+        'public_id' => env('TIPTOP_PAY_PUBLIC_ID'),
+        'api_secret' => env('TIPTOP_PAY_API_SECRET'),
+        'connect_timeout' => 3,
+        'timeout' => 30,
+    ],
+
     'fcm' => [
         'project_id' => env('FIREBASE_PROJECT_ID'),
         'credentials' => env('FIREBASE_CREDENTIALS'),

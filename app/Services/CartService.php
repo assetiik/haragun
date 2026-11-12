@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\OrderStatus;
 use App\Enums\OrderType;
 use App\Enums\PaymentMethod;
+use App\Enums\PaymentStatus;
 use App\Enums\ProductKind;
 use App\Models\Cart;
 use App\Models\CartItem;
@@ -15,12 +16,15 @@ use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\ProductSize;
 use App\Models\User;
+use App\Services\TipTopPay\TipTopPayService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class CartService
 {
+    public function __construct(private TipTopPayService $tipTopPay) {}
+
     public function getOrCreate(User $user, Establishment $establishment): Cart
     {
         $this->ensureCoffee($establishment);
@@ -139,7 +143,9 @@ class CartService
             ]);
         }
 
-        $order = DB::transaction(function () use ($cart, $paymentLabel) {
+        $awaitingPayment = $this->tipTopPay->isEnabled();
+
+        $order = DB::transaction(function () use ($cart, $paymentLabel, $awaitingPayment) {
             $number = $this->nextNumber();
             $now = now();
             $items = $cart->items;
@@ -171,10 +177,14 @@ class CartService
                 'items_count' => $cart->itemsCount(),
                 'summary_title' => $this->summaryTitle($lines),
                 'summary_short' => $this->summaryShort($cart->itemsCount()),
-                'payment_label' => $paymentLabel ?: $cart->payment_method->orderLabel(),
+                'payment_label' => $awaitingPayment
+                    ? null
+                    : ($paymentLabel ?: $cart->payment_method->orderLabel()),
+                'payment_status' => $awaitingPayment ? PaymentStatus::Pending : PaymentStatus::Paid,
+                'payment_provider' => $awaitingPayment ? 'tiptop' : null,
                 'points_to_earn' => (int) floor($subtotal / 20),
                 'prep_minutes' => 15,
-                'paid_at' => $now,
+                'paid_at' => $awaitingPayment ? null : $now,
                 'accepted_at' => $now,
                 'preparing_at' => null,
                 'ready_at' => null,

@@ -12,6 +12,7 @@ use App\Http\Resources\OrderDetailResource;
 use App\Models\CartItem;
 use App\Models\Establishment;
 use App\Services\CartService;
+use App\Services\TipTopPay\TipTopPayService;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -19,7 +20,10 @@ use Illuminate\Http\Request;
 #[Group('Cart', weight: 6)]
 class CartController extends Controller
 {
-    public function __construct(private CartService $carts) {}
+    public function __construct(
+        private CartService $carts,
+        private TipTopPayService $payments,
+    ) {}
 
     public function show(Request $request, Establishment $establishment): JsonResponse
     {
@@ -87,6 +91,7 @@ class CartController extends Controller
 
         return response()->json([
             'order' => new OrderDetailResource($result['order']),
+            'payment' => $this->payments->paymentPayload($result['order']),
             'coffee_screen' => new OrderCoffeeScreenResource($result['order']),
             'cart' => new CartResource($result['cart']),
         ], 201);

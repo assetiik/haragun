@@ -4,18 +4,23 @@ namespace App\Services;
 
 use App\Enums\ProductKind;
 use App\Exceptions\RinkApiException;
+use App\Exceptions\TipTopPayException;
 use App\Models\Establishment;
 use App\Models\Order;
 use App\Models\User;
 use App\Services\RinkApi\RinkApiCatalog;
 use App\Services\RinkApi\RinkApiClient;
+use App\Services\TipTopPay\TipTopPayService;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class IceTicketService
 {
     public function __construct(
         private RinkApiCatalog $rink,
         private RinkApiClient $rinkClient,
+        private TipTopPayService $tipTopPay,
     ) {}
 
     /**
@@ -57,10 +62,35 @@ class IceTicketService
         $ticket = $this->rinkClient->refundTicket($barcode, $payload);
         $refundedAmount = (int) ($ticket['price'] ?? $this->localPassPrice($order, $barcode));
 
+        try {
+            $this->tipTopPay->refundOrderAmount($order, $refundedAmount);
+        } catch (TipTopPayException $exception) {
+            Log::error('TipTop Pay: не удалось вернуть деньги за билет', [
+                'order_id' => $order->id,
+                'barcode' => $barcode,
+                'amount' => $refundedAmount,
+                'error' => $exception->getMessage(),
+            ]);
+
+            throw ValidationException::withMessages([
+                'barcode' => ['Билет возвращён в кассе, но возврат оплаты не выполнен. Обратитесь в поддержку.'],
+            ]);
+        } catch (Throwable $exception) {
+            Log::error('TipTop Pay: неожиданная ошибка возврата', [
+                'order_id' => $order->id,
+                'barcode' => $barcode,
+                'error' => $exception->getMessage(),
+            ]);
+
+            throw ValidationException::withMessages([
+                'barcode' => ['Билет возвращён в кассе, но возврат оплаты не выполнен. Обратитесь в поддержку.'],
+            ]);
+        }
+
         $order->load(['establishment', 'items.product', 'feedback']);
 
         return [
-            'order' => $order,
+            'order' => $order->fresh(['establishment', 'items.product', 'feedback']) ?? $order,
             'ticket' => $ticket,
             'refunded_amount' => $refundedAmount,
         ];

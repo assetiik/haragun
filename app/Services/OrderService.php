@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\OrderStatus;
 use App\Enums\OrderType;
+use App\Enums\PaymentStatus;
 use App\Enums\ProductKind;
 use App\Models\Establishment;
 use App\Models\Order;
@@ -14,6 +15,7 @@ use App\Services\DssSoft\DssSoftClient;
 use App\Services\Iiko\IikoCatalog;
 use App\Services\RinkApi\RinkApiCatalog;
 use App\Services\RinkApi\RinkApiClient;
+use App\Services\TipTopPay\TipTopPayService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -28,6 +30,7 @@ class OrderService
         private RinkApiCatalog $rink,
         private RinkApiClient $rinkClient,
         private IikoCatalog $iiko,
+        private TipTopPayService $tipTopPay,
     ) {}
 
     /**
@@ -54,6 +57,7 @@ class OrderService
         $rinkHold = null;
         $order = null;
         $confirmed = false;
+        $awaitingPayment = $this->tipTopPay->isEnabled();
 
         try {
             if ($type === OrderType::Tickets && $this->rink->usesRink($establishment) && $ticketLines->isNotEmpty()) {
@@ -68,7 +72,7 @@ class OrderService
                 $dssHold = $this->dssClient->createOrder($this->dssOrderPayload($user, $ticketLines->all(), $slot));
             }
 
-            $order = DB::transaction(function () use ($user, $payload, $quote, $type, $slot, $session, $dssHold, $rinkHold) {
+            $order = DB::transaction(function () use ($user, $payload, $quote, $type, $slot, $session, $dssHold, $rinkHold, $awaitingPayment) {
                 $number = $this->nextNumber();
                 $now = now();
                 $sessionEnds = $session['ends_at'] ?? $slot['ends_at'] ?? $this->sessionEndsAt($payload['time']);
@@ -78,7 +82,9 @@ class OrderService
                     'user_id' => $user->id,
                     'establishment_id' => $payload['establishment_id'],
                     'type' => $type,
-                    'status' => $type === OrderType::Tickets ? OrderStatus::Confirmed : OrderStatus::Accepted,
+                    'status' => $type === OrderType::Tickets
+                        ? ($awaitingPayment ? OrderStatus::Accepted : OrderStatus::Confirmed)
+                        : OrderStatus::Accepted,
                     'number' => $number,
                     'code' => 'HRG-'.$number,
                     'dss_order_id' => $dssHold['id'] ?? null,
@@ -98,12 +104,16 @@ class OrderService
                     'items_count' => $quote['items_count'],
                     'summary_title' => $this->summaryTitle($quote['lines']),
                     'summary_short' => $this->summaryShort($quote['lines']),
-                    'payment_label' => $payload['payment_label'] ?? 'Kaspi Gold · 4417',
+                    'payment_label' => $awaitingPayment
+                        ? null
+                        : ($payload['payment_label'] ?? 'Kaspi Gold · 4417'),
+                    'payment_status' => $awaitingPayment ? PaymentStatus::Pending : PaymentStatus::Paid,
+                    'payment_provider' => $awaitingPayment ? 'tiptop' : null,
                     'promo_code' => $quote['promo_code'] ?? null,
                     'promo_discount' => (int) ($quote['promo_discount'] ?? 0),
                     'points_to_earn' => (int) floor($quote['total'] / 20),
                     'prep_minutes' => $type === OrderType::Venue ? 5 : null,
-                    'paid_at' => $now,
+                    'paid_at' => $awaitingPayment ? null : $now,
                     'accepted_at' => $now,
                     'preparing_at' => null,
                     'ready_at' => null,
@@ -132,22 +142,24 @@ class OrderService
                 return $order;
             });
 
-            if (is_array($rinkHold) && isset($rinkHold['order_id'])) {
-                $confirmedOrder = $this->rinkClient->confirmOrder((string) $rinkHold['order_id']);
-                $confirmed = true;
-                $this->attachRinkBarcodes($order, $confirmedOrder, $ticketLines->all());
-            } elseif (is_array($dssHold) && isset($dssHold['id'])) {
-                $dssOrder = $this->dssClient->confirmOrder((int) $dssHold['id']);
-                $confirmed = true;
-                $this->attachBarcodes($order, $dssOrder, $ticketLines->all());
-            }
+            if (! $awaitingPayment) {
+                if (is_array($rinkHold) && isset($rinkHold['order_id'])) {
+                    $confirmedOrder = $this->rinkClient->confirmOrder((string) $rinkHold['order_id']);
+                    $confirmed = true;
+                    $this->attachRinkBarcodes($order, $confirmedOrder, $ticketLines->all());
+                } elseif (is_array($dssHold) && isset($dssHold['id'])) {
+                    $dssOrder = $this->dssClient->confirmOrder((int) $dssHold['id']);
+                    $confirmed = true;
+                    $this->attachBarcodes($order, $dssOrder, $ticketLines->all());
+                }
 
-            if ($type === OrderType::Venue && $this->iiko->usesIiko($establishment)) {
-                $iikoOrder = $this->iiko->createVenueOrder($order, $user, $quote['lines']);
-                $order->forceFill([
-                    'iiko_order_id' => $iikoOrder['orderId'],
-                    'iiko_correlation_id' => $iikoOrder['correlationId'] ?: null,
-                ])->save();
+                if ($type === OrderType::Venue && $this->iiko->usesIiko($establishment)) {
+                    $iikoOrder = $this->iiko->createVenueOrder($order, $user, $quote['lines']);
+                    $order->forceFill([
+                        'iiko_order_id' => $iikoOrder['orderId'],
+                        'iiko_correlation_id' => $iikoOrder['correlationId'] ?: null,
+                    ])->save();
+                }
             }
 
             return $order->load(['items', 'establishment']);

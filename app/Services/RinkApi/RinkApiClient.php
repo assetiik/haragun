@@ -116,7 +116,12 @@ class RinkApiClient
      */
     public function refundTicket(string $code, array $payload = []): array
     {
-        return $this->jsonObject($this->send('POST', "/tickets/{$code}/refund", $payload));
+        // Their API expects a JSON object/null body, not []. Empty PHP arrays encode as [].
+        return $this->jsonObject($this->send(
+            'POST',
+            "/tickets/{$code}/refund",
+            $payload === [] ? new \stdClass : $payload,
+        ));
     }
 
     /**
@@ -129,9 +134,9 @@ class RinkApiClient
     }
 
     /**
-     * @param  array<string, mixed>  $queryOrBody
+     * @param  array<string, mixed>|\stdClass  $queryOrBody
      */
-    private function send(string $method, string $path, array $queryOrBody = []): Response
+    private function send(string $method, string $path, array|\stdClass $queryOrBody = []): Response
     {
         if (! $this->isConfigured()) {
             throw new RinkApiException('Rink API не настроен: нет base URL или ключа.');
@@ -157,8 +162,10 @@ class RinkApiClient
         }
 
         $response = match ($method) {
-            'GET' => $request->get($path, $queryOrBody),
-            'POST' => $request->post($path, $queryOrBody),
+            'GET' => $request->get($path, is_array($queryOrBody) ? $queryOrBody : []),
+            'POST' => is_array($queryOrBody) && $queryOrBody === []
+                ? $request->post($path)
+                : $request->post($path, $queryOrBody),
             default => throw new RinkApiException("Неподдерживаемый метод Rink API: {$method}"),
         };
 

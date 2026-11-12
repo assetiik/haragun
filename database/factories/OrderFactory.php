@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Enums\OrderStatus;
 use App\Enums\OrderType;
+use App\Enums\PaymentStatus;
 use App\Models\Establishment;
 use App\Models\Order;
 use App\Models\User;
@@ -39,6 +40,9 @@ class OrderFactory extends Factory
             'summary_title' => 'Капучино и пончик',
             'summary_short' => '2 позиции',
             'payment_label' => 'Kaspi Gold · 4417',
+            'payment_status' => PaymentStatus::Paid,
+            'payment_provider' => null,
+            'payment_refunded_total' => 0,
             'points_to_earn' => 500,
             'prep_minutes' => 5,
             'paid_at' => now(),

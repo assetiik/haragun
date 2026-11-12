@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\EstablishmentType;
 use App\Enums\OrderStatus;
 use App\Enums\OrderType;
+use App\Enums\PaymentStatus;
 use App\Observers\OrderObserver;
 use App\Support\Money;
 use App\Support\StoredUrl;
@@ -48,6 +49,10 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'summary_title',
     'summary_short',
     'payment_label',
+    'payment_status',
+    'payment_provider',
+    'tiptop_transaction_id',
+    'payment_refunded_total',
     'promo_code',
     'promo_discount',
     'points_to_earn',
@@ -87,16 +92,19 @@ class Order extends Model
         return [
             'type' => OrderType::class,
             'status' => OrderStatus::class,
+            'payment_status' => PaymentStatus::class,
             'session_date' => 'date',
             'dss_order_id' => 'integer',
             'dss_day_id' => 'integer',
             'dss_slot_id' => 'integer',
             'rink_session_id' => 'integer',
+            'tiptop_transaction_id' => 'integer',
             'number' => 'integer',
             'guest_number' => 'integer',
             'subtotal' => 'integer',
             'discount_total' => 'integer',
             'promo_discount' => 'integer',
+            'payment_refunded_total' => 'integer',
             'total' => 'integer',
             'items_count' => 'integer',
             'points_to_earn' => 'integer',

@@ -173,8 +173,10 @@ Authorization: Bearer …
 
 Кнопки:
 
-- **Вернуть** — если `can_refund == true`
-- **Перенести** — если `can_move == true`
+- **Вернуть** — только если `can_refund == true` (после конца окна входа статус `expired`, возврат каток отклонит)
+- **Перенести** — только если `can_move == true`
+
+Не показывай кнопку возврата при `status` ∈ `used` / `refunded` / `cancelled` / `expired`.
 
 `is_active` — можно ли сейчас показать «годен к проходу» (окно входа).  
 Для текста «Вход откроется в …» используй `session.entry_opens_at` **и** текущее время / `is_active`, не только строку кнопки.
@@ -212,7 +214,7 @@ Authorization: Bearer …
 }
 ```
 
-Деньги гостю возвращает **ваше** платёжное решение (как договорено). Пока можно показать `message` + сумму `refunded_amount`.  
+Деньги гостю возвращает TipTop Pay на бэкенде (см. `docs/flutter-tiptop-pay.md`). Приложению ничего менять не нужно — показать `message` + сумму `refunded_amount`.  
 Повторный refund безопасен на стороне катка.
 
 Ошибки: `message` (`ticket_used`, `ticket_expired`, …).

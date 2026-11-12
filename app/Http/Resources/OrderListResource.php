@@ -39,6 +39,7 @@ class OrderListResource extends JsonResource
             'summary_title' => $this->summary_title,
             'summary_short' => $this->summary_short,
             'payment_label' => $this->payment_label,
+            'payment_status' => $this->payment_status?->value ?? 'paid',
             'placed_at' => $this->placedAt()->toIso8601String(),
             'thumbnails' => $this->thumbnails(),
         ];

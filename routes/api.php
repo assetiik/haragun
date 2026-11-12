@@ -16,10 +16,12 @@ use App\Http\Controllers\OfferController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\OrderFeedbackController;
 use App\Http\Controllers\OrderQuoteController;
+use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PrivacyPolicyController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PromoTileController;
 use App\Http\Controllers\RentalController;
+use App\Http\Controllers\TipTopWebhookController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/home', HomeController::class)->name('api.home');
@@ -51,6 +53,13 @@ Route::post('/orders/quote', OrderQuoteController::class)
     ->name('api.orders.quote');
 Route::get('/establishments/{establishment}/promo-codes/{code}', [IceTicketController::class, 'previewPromo'])
     ->name('api.establishments.promo-codes.show');
+
+Route::prefix('payments/tiptop')->group(function () {
+    Route::post('/check', [TipTopWebhookController::class, 'check'])->name('api.payments.tiptop.check');
+    Route::post('/pay', [TipTopWebhookController::class, 'pay'])->name('api.payments.tiptop.pay');
+    Route::post('/fail', [TipTopWebhookController::class, 'fail'])->name('api.payments.tiptop.fail');
+    Route::post('/refund', [TipTopWebhookController::class, 'refund'])->name('api.payments.tiptop.refund');
+});
 
 Route::prefix('auth')->group(function () {
     Route::post('/send-code', [AuthController::class, 'sendCode'])
@@ -105,6 +114,10 @@ Route::middleware('auth:sanctum')->group(function () {
         ->name('api.orders.coffee-screen');
     Route::post('/orders/{order}/feedback', [OrderFeedbackController::class, 'store'])
         ->name('api.orders.feedback');
+    Route::post('/orders/{order}/payments/charge', [PaymentController::class, 'charge'])
+        ->name('api.orders.payments.charge');
+    Route::post('/orders/{order}/payments/3ds', [PaymentController::class, 'complete3ds'])
+        ->name('api.orders.payments.3ds');
 
     Route::post('/orders/{order}/passes/{barcode}/refund', [IceTicketController::class, 'refund'])
         ->name('api.orders.passes.refund');
