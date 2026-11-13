@@ -214,7 +214,7 @@ Authorization: Bearer …
 }
 ```
 
-Деньги гостю возвращает TipTop Pay на бэкенде (см. `docs/flutter-tiptop-pay.md`). Приложению ничего менять не нужно — показать `message` + сумму `refunded_amount`.  
+Деньги гостю возвращает **ваше** платёжное решение (как договорено). Пока можно показать `message` + сумму `refunded_amount`.  
 Повторный refund безопасен на стороне катка.
 
 Ошибки: `message` (`ticket_used`, `ticket_expired`, …).

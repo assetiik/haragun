@@ -6,7 +6,6 @@ use App\Http\Requests\ChargeOrderPaymentRequest;
 use App\Http\Requests\CompleteOrder3dsRequest;
 use App\Http\Resources\OrderDetailResource;
 use App\Models\Order;
-use App\Services\IceTicketService;
 use App\Services\TipTopPay\TipTopPayService;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
@@ -14,10 +13,7 @@ use Illuminate\Http\JsonResponse;
 #[Group('Payments', weight: 9)]
 class PaymentController extends Controller
 {
-    public function __construct(
-        private TipTopPayService $payments,
-        private IceTicketService $iceTickets,
-    ) {}
+    public function __construct(private TipTopPayService $payments) {}
 
     public function charge(ChargeOrderPaymentRequest $request, Order $order): JsonResponse
     {
@@ -28,8 +24,6 @@ class PaymentController extends Controller
             $request->validated('name'),
             (string) $request->ip(),
         );
-
-        $request->attributes->set('rink_tickets', $this->iceTickets->remoteTicketsByCode($result['order']));
 
         $payload = [
             'order' => new OrderDetailResource($result['order']),
@@ -53,8 +47,6 @@ class PaymentController extends Controller
             (int) $validated['transaction_id'],
             (string) $validated['pa_res'],
         );
-
-        $request->attributes->set('rink_tickets', $this->iceTickets->remoteTicketsByCode($result['order']));
 
         $payload = [
             'order' => new OrderDetailResource($result['order']),

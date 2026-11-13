@@ -2,16 +2,13 @@
 
 namespace App\Services\TipTopPay;
 
-use App\Enums\OrderStatus;
+use App\Enums\EstablishmentType;
 use App\Enums\OrderType;
 use App\Enums\PaymentStatus;
-use App\Enums\ProductKind;
 use App\Exceptions\TipTopPayException;
 use App\Models\Order;
 use App\Models\User;
-use App\Services\DssSoft\DssSoftClient;
 use App\Services\Iiko\IikoCatalog;
-use App\Services\RinkApi\RinkApiClient;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -21,8 +18,6 @@ class TipTopPayService
 {
     public function __construct(
         private TipTopPayClient $client,
-        private RinkApiClient $rinkClient,
-        private DssSoftClient $dssClient,
         private IikoCatalog $iiko,
     ) {}
 
@@ -31,12 +26,24 @@ class TipTopPayService
         return (bool) config('services.tiptop_pay.enabled') && $this->client->isConfigured();
     }
 
+    public function appliesTo(Order $order): bool
+    {
+        $order->loadMissing('establishment');
+
+        return $order->type === OrderType::Venue
+            && $order->establishment?->type === EstablishmentType::Coffee;
+    }
+
     /**
      * @return array<string, mixed>|null
      */
     public function paymentPayload(Order $order): ?array
     {
-        if (! $this->isEnabled()) {
+        if (! $this->isEnabled() || ! $this->appliesTo($order)) {
+            return null;
+        }
+
+        if ($order->payment_provider !== 'tiptop' && ! ($order->payment_status?->canCharge() ?? false)) {
             return null;
         }
 
@@ -105,7 +112,7 @@ class TipTopPayService
     {
         $order = $this->findOrderFromNotification($payload);
 
-        if ($order === null) {
+        if ($order === null || ! $this->appliesTo($order)) {
             return ['code' => 10];
         }
 
@@ -128,7 +135,7 @@ class TipTopPayService
     {
         $order = $this->findOrderFromNotification($payload);
 
-        if ($order === null) {
+        if ($order === null || ! $this->appliesTo($order)) {
             return ['code' => 0];
         }
 
@@ -155,7 +162,7 @@ class TipTopPayService
     {
         $order = $this->findOrderFromNotification($payload);
 
-        if ($order === null) {
+        if ($order === null || ! $this->appliesTo($order)) {
             return ['code' => 0];
         }
 
@@ -182,7 +189,7 @@ class TipTopPayService
     {
         $order = $this->findOrderFromNotification($payload);
 
-        if ($order === null) {
+        if ($order === null || ! $this->appliesTo($order)) {
             return ['code' => 0];
         }
 
@@ -201,7 +208,7 @@ class TipTopPayService
 
     public function refundOrderAmount(Order $order, int $amount): void
     {
-        if ($amount < 1) {
+        if ($amount < 1 || ! $this->appliesTo($order)) {
             return;
         }
 
@@ -335,26 +342,6 @@ class TipTopPayService
     private function finalizeExternalFulfillment(Order $order): void
     {
         try {
-            if ($order->type === OrderType::Tickets && filled($order->rink_order_id) && $this->rinkClient->isConfigured()) {
-                if ($this->orderNeedsBarcodes($order)) {
-                    $confirmed = $this->rinkClient->confirmOrder((string) $order->rink_order_id);
-                    $this->attachRinkBarcodes($order, $confirmed);
-                }
-
-                $order->forceFill([
-                    'status' => OrderStatus::Confirmed,
-                ])->save();
-            } elseif ($order->type === OrderType::Tickets && filled($order->dss_order_id) && $this->dssClient->isConfigured()) {
-                if ($this->orderNeedsBarcodes($order)) {
-                    $confirmed = $this->dssClient->confirmOrder((int) $order->dss_order_id);
-                    $this->attachDssBarcodes($order, $confirmed);
-                }
-
-                $order->forceFill([
-                    'status' => OrderStatus::Confirmed,
-                ])->save();
-            }
-
             if (
                 $order->type === OrderType::Venue
                 && blank($order->iiko_order_id)
@@ -386,73 +373,6 @@ class TipTopPayService
             ]);
 
             throw $exception;
-        }
-    }
-
-    private function orderNeedsBarcodes(Order $order): bool
-    {
-        foreach ($order->items()->get() as $item) {
-            if ($item->kind !== ProductKind::Ticket->value || $item->is_discount) {
-                continue;
-            }
-
-            if (blank($item->barcodes)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * @param  array<string, mixed>  $rinkOrder
-     */
-    private function attachRinkBarcodes(Order $order, array $rinkOrder): void
-    {
-        $available = collect($rinkOrder['tickets'] ?? [])
-            ->map(fn (mixed $item): string => (string) data_get($item, 'code', ''))
-            ->filter()
-            ->values();
-
-        foreach ($order->items()->get() as $item) {
-            if ($item->kind !== ProductKind::Ticket->value || $item->is_discount) {
-                continue;
-            }
-
-            if (filled($item->barcodes)) {
-                continue;
-            }
-
-            $codes = $available->splice(0, (int) $item->quantity)->all();
-            $item->update([
-                'barcodes' => $codes === [] ? null : array_values($codes),
-            ]);
-        }
-    }
-
-    /**
-     * @param  array<string, mixed>  $dssOrder
-     */
-    private function attachDssBarcodes(Order $order, array $dssOrder): void
-    {
-        $available = collect($dssOrder['items'] ?? [])
-            ->map(fn (mixed $item): string => (string) data_get($item, 'barcode', ''))
-            ->filter()
-            ->values();
-
-        foreach ($order->items()->get() as $item) {
-            if ($item->kind !== ProductKind::Ticket->value || $item->is_discount) {
-                continue;
-            }
-
-            if (filled($item->barcodes)) {
-                continue;
-            }
-
-            $codes = $available->splice(0, (int) $item->quantity)->all();
-            $item->update([
-                'barcodes' => $codes === [] ? null : array_values($codes),
-            ]);
         }
     }
 
@@ -497,7 +417,7 @@ class TipTopPayService
         $invoiceId = $payload['InvoiceId'] ?? null;
 
         if (filled($invoiceId) && ctype_digit((string) $invoiceId)) {
-            $order = Order::query()->find((int) $invoiceId);
+            $order = Order::query()->with('establishment')->find((int) $invoiceId);
 
             if ($order !== null) {
                 return $order;
@@ -508,6 +428,7 @@ class TipTopPayService
 
         if (filled($transactionId)) {
             return Order::query()
+                ->with('establishment')
                 ->where('tiptop_transaction_id', (int) $transactionId)
                 ->first();
         }
@@ -528,6 +449,12 @@ class TipTopPayService
     {
         if ($order->user_id !== $user->id) {
             abort(404);
+        }
+
+        if (! $this->appliesTo($order)) {
+            throw ValidationException::withMessages([
+                'payment' => ['TipTop Pay доступен только для отдельных кофеен.'],
+            ]);
         }
 
         if (! $order->payment_status?->canCharge()) {

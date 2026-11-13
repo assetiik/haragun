@@ -1,48 +1,62 @@
-# Контракт Flutter: TipTop Pay
+# Контракт Flutter: TipTop Pay (только отдельные кофейни)
 
-Оплата картой через [TipTop Pay](https://developers.tiptoppay.kz).  
-`API Secret` только на сервере. В приложение кладём только `public_id` из ответа.
+Оплата картой через [TipTop Pay](https://developers.tiptoppay.kz).
 
-Пока `TIPTOP_PAY_ENABLED=false` / нет ключей — поведение как раньше: заказ сразу `payment_status=paid`, поле `payment` = `null`.
+**Только** для заведений `type = coffee` из админки (отдельные кофейни).  
+**Не** для катка / билетов / аренды / меню внутри `ice_arena`.
+
+`API Secret` только на сервере. В приложение — `public_id` из ответа.
+
+Пока `TIPTOP_PAY_ENABLED=false` / нет ключей — checkout кофейни сразу `paid`, `payment = null`.
 
 ---
 
-## 1. Создание заказа / checkout корзины
+## 1. Checkout корзины кофейни
 
-`POST /api/orders` и `POST /api/establishments/{id}/cart/checkout` дополнительно отдают:
+```http
+POST /api/establishments/{id}/cart/checkout
+Authorization: Bearer …
+```
+
+Ответ:
 
 ```json
 {
-  "order": { "...": "как раньше + payment_status / payment_provider / payment" },
+  "order": {
+    "type": "venue",
+    "payment_status": "pending",
+    "payment_provider": "tiptop",
+    "payment": { "provider": "tiptop", "required": true, "…" }
+  },
   "payment": {
     "provider": "tiptop",
     "required": true,
     "status": "pending",
     "public_id": "pk_…",
-    "amount": 10000,
+    "amount": 2940,
     "currency": "KZT",
     "invoice_id": "50",
     "account_id": "12",
-    "description": "Взрослый и коньки",
+    "description": "Латте",
     "transaction_id": null
-  }
+  },
+  "coffee_screen": { "…" },
+  "cart": { "…" }
 }
 ```
 
-Если TipTop выключен: `"payment": null`, заказ уже оплачен.
+Если TipTop выключен или заведение не `coffee`: `"payment": null`, заказ уже оплачен.
 
-Пока `payment.required == true` / `payment_status == pending`:
+Пока `payment.required == true` — заказ ещё не в iiko / не считать готовым к выдаче.
 
-- QR / passes могут быть без barcode
-- билеты ещё не confirmed на кассе
-- iiko для кофе ещё не создан
+`POST /api/orders` (билеты катка) TipTop **не** использует.
 
 ---
 
-## 2. Оплата (SDK → криптограмма → наш API)
+## 2. Оплата
 
-1. TipTop Flutter SDK + `payment.public_id` → криптограмма карты  
-2. Отправить на бэкенд:
+1. TipTop Flutter SDK + `payment.public_id` → криптограмма  
+2. На бэкенд:
 
 ```http
 POST /api/orders/{order_id}/payments/charge
@@ -56,21 +70,12 @@ Authorization: Bearer …
 }
 ```
 
-Ответ успех:
+Успех: `payment_status=paid`, `payment.required=false`.
+
+3-D Secure:
 
 ```json
 {
-  "order": { "payment_status": "paid", "payment_label": "Visa · 4242", "…": "…" },
-  "payment": { "required": false, "status": "paid", "…" }
-}
-```
-
-Нужен 3-D Secure:
-
-```json
-{
-  "order": { "payment_status": "pending", "…" },
-  "payment": { "required": true, "status": "pending", "…" },
   "three_ds": {
     "transaction_id": 891463508,
     "acs_url": "https://…",
@@ -80,20 +85,17 @@ Authorization: Bearer …
 }
 ```
 
-После ACS открыть банк и завершить:
+Затем:
 
 ```http
 POST /api/orders/{order_id}/payments/3ds
 ```
 
 ```json
-{
-  "transaction_id": 891463508,
-  "pa_res": "…"
-}
+{ "transaction_id": 891463508, "pa_res": "…" }
 ```
 
-Ошибка оплаты: `422`, `message` / `errors.payment`.
+Ошибка: `422`, `errors.payment`.
 
 ---
 
@@ -102,25 +104,16 @@ POST /api/orders/{order_id}/payments/3ds
 | `payment_status` | UI |
 |---|---|
 | `pending` | ждём оплату |
-| `paid` | ок, показывать QR / кофе-экран |
-| `failed` | предложить повторить charge |
-| `partially_refunded` / `refunded` | часть/весь возврат |
-
-`GET /api/orders/{id}` — как раньше + поля `payment_status`, `payment_provider`, `payment`.
+| `paid` | кофе-экран / заказ принят |
+| `failed` | повторить charge |
+| `partially_refunded` / `refunded` | возврат |
 
 ---
 
-## 4. Возврат билета
+## 4. Чеклист Flutter
 
-`POST /api/orders/{id}/passes/{barcode}/refund` без изменений для приложения.  
-Бэкенд сам делает TipTop `refund` на сумму билета.
-
----
-
-## 5. Чеклист Flutter
-
-- [ ] После create/checkout смотреть `payment`
-- [ ] Если `payment.required` — SDK + `charge` (+ 3DS)
-- [ ] Успех только при `payment_status=paid` (или `payment.required=false`)
-- [ ] Не показывать «готовый» QR до оплаты
+- [ ] TipTop только на checkout **отдельной кофейни** (`type=coffee`)
+- [ ] Каток / билеты — без TipTop
+- [ ] Если `payment.required` — SDK + charge (+ 3DS)
+- [ ] Успех только при `payment_status=paid`
 - [ ] `public_id` из ответа, secret не хранить

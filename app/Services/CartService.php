@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\EstablishmentType;
 use App\Enums\OrderStatus;
 use App\Enums\OrderType;
 use App\Enums\PaymentMethod;
@@ -143,7 +144,9 @@ class CartService
             ]);
         }
 
-        $awaitingPayment = $this->tipTopPay->isEnabled();
+        $cart->loadMissing('establishment');
+        $awaitingPayment = $this->tipTopPay->isEnabled()
+            && $cart->establishment?->type === EstablishmentType::Coffee;
 
         $order = DB::transaction(function () use ($cart, $paymentLabel, $awaitingPayment) {
             $number = $this->nextNumber();
