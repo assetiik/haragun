@@ -18,7 +18,8 @@ class CompleteOrder3dsRequest extends FormRequest
     {
         return [
             'transaction_id' => ['required', 'integer', 'min:1'],
-            'pa_res' => ['required', 'string', 'min:10'],
+            // TipTop test ACS can return short PaRes values like "AQ==".
+            'pa_res' => ['required', 'string', 'min:1'],
         ];
     }
 }
