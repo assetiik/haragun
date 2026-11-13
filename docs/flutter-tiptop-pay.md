@@ -7,25 +7,37 @@
 
 `API Secret` только на сервере. В приложение — `public_id` из ответа.
 
-Пока `TIPTOP_PAY_ENABLED=false` / нет ключей — checkout кофейни сразу `paid`, `payment = null`.
+Пока `TIPTOP_PAY_ENABLED=false` / нет ключей — checkout сразу `paid`, корзина очищается, `payment = null`.
 
 ---
 
-## 1. Checkout корзины кофейни
+## Поток (важно)
+
+1. `POST .../cart/checkout` → заказ `payment_status=pending`, **корзина НЕ очищается**, `coffee_screen=null`, заказ **не** активен и **не** уходит в iiko.
+2. `POST .../payments/charge` (+ при необходимости `.../payments/3ds`).
+3. Только после успешной оплаты: `payment_status=paid`, `accepted_at`/`paid_at` заполнены, корзина очищается, появляется `coffee_screen`, заказ можно считать принятым заведением.
+
+При отказе / отмене / незавершённом 3DS: корзина остаётся, заказ не готовится.
+
+---
+
+## 1. Checkout
 
 ```http
 POST /api/establishments/{id}/cart/checkout
 Authorization: Bearer …
 ```
 
-Ответ:
+Ответ при TipTop:
 
 ```json
 {
   "order": {
     "type": "venue",
+    "status": "accepted",
     "payment_status": "pending",
     "payment_provider": "tiptop",
+    "is_active": false,
     "payment": { "provider": "tiptop", "required": true, "…" }
   },
   "payment": {
@@ -40,52 +52,37 @@ Authorization: Bearer …
     "description": "Латте",
     "transaction_id": null
   },
-  "coffee_screen": { "…" },
-  "cart": { "…" }
+  "coffee_screen": null,
+  "cart": { "is_empty": false, "items": ["…ещё на месте…"] }
 }
 ```
 
-Если TipTop выключен или заведение не `coffee`: `"payment": null`, заказ уже оплачен.
-
-Пока `payment.required == true` — заказ ещё не в iiko / не считать готовым к выдаче.
-
-`POST /api/orders` (билеты катка) TipTop **не** использует.
+Пока `payment.required == true` / `is_active == false` — **не** показывать экран «заказ принят».
 
 ---
 
-## 2. Оплата
-
-1. TipTop Flutter SDK + `payment.public_id` → криптограмма  
-2. На бэкенд:
+## 2. Charge / 3DS
 
 ```http
 POST /api/orders/{order_id}/payments/charge
-Authorization: Bearer …
 ```
 
 ```json
-{
-  "cryptogram": "…",
-  "name": "CARDHOLDER NAME"
-}
+{ "cryptogram": "…", "name": "CARDHOLDER NAME" }
 ```
 
-Успех: `payment_status=paid`, `payment.required=false`.
-
-3-D Secure:
+Успех:
 
 ```json
 {
-  "three_ds": {
-    "transaction_id": 891463508,
-    "acs_url": "https://…",
-    "pa_req": "…",
-    "iframe_is_allowed": true
-  }
+  "order": { "payment_status": "paid", "is_active": true, "…" },
+  "payment": { "required": false, "status": "paid", "…" },
+  "coffee_screen": { "screen": "accepted", "…" },
+  "cart": { "is_empty": true }
 }
 ```
 
-Затем:
+Нужен 3DS — в ответе `three_ds`, корзина ещё полная, `coffee_screen=null`. Затем:
 
 ```http
 POST /api/orders/{order_id}/payments/3ds
@@ -95,25 +92,24 @@ POST /api/orders/{order_id}/payments/3ds
 { "transaction_id": 891463508, "pa_res": "…" }
 ```
 
-Ошибка: `422`, `errors.payment`.
+Ошибка оплаты: `422` / `errors.payment`, корзина на месте, можно повторить charge.
 
 ---
 
 ## 3. Статусы
 
-| `payment_status` | UI |
-|---|---|
-| `pending` | ждём оплату |
-| `paid` | кофе-экран / заказ принят |
-| `failed` | повторить charge |
-| `partially_refunded` / `refunded` | возврат |
+| Этап | `payment_status` | `is_active` | `coffee_screen` | Корзина |
+|---|---|---|---|---|
+| После checkout | `pending` | false | null | сохранена |
+| 3DS / отказ | `pending` / `failed` | false | null | сохранена |
+| После оплаты | `paid` | true | accepted… | пустая |
 
 ---
 
 ## 4. Чеклист Flutter
 
-- [ ] TipTop только на checkout **отдельной кофейни** (`type=coffee`)
+- [ ] После checkout смотреть `payment.required` — идти в SDK, **не** считать заказ принятым
+- [ ] Не очищать UI-корзину сами — бэкенд чистит только после оплаты
+- [ ] Успех только при `payment_status=paid` (charge/3ds или refresh order)
+- [ ] При fail/cancel — оставить корзину и дать повторить оплату
 - [ ] Каток / билеты — без TipTop
-- [ ] Если `payment.required` — SDK + charge (+ 3DS)
-- [ ] Успех только при `payment_status=paid`
-- [ ] `public_id` из ответа, secret не хранить

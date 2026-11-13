@@ -88,11 +88,16 @@ class CartController extends Controller
     {
         $cart = $this->carts->getOrCreate($request->user(), $establishment);
         $result = $this->carts->checkout($cart, $request->validated('payment_label'));
+        $payment = $this->payments->paymentPayload($result['order']);
+        $awaitingPayment = is_array($payment) && ($payment['required'] ?? false);
 
         return response()->json([
             'order' => new OrderDetailResource($result['order']),
-            'payment' => $this->payments->paymentPayload($result['order']),
-            'coffee_screen' => new OrderCoffeeScreenResource($result['order']),
+            'payment' => $payment,
+            // Coffee screen only after payment — pending TipTop must not look "accepted".
+            'coffee_screen' => $awaitingPayment
+                ? null
+                : new OrderCoffeeScreenResource($result['order']),
             'cart' => new CartResource($result['cart']),
         ], 201);
     }

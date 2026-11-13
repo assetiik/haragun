@@ -64,17 +64,27 @@ class TipTopPayApiTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('order.payment_status', 'pending')
             ->assertJsonPath('order.payment_provider', 'tiptop')
+            ->assertJsonPath('order.is_active', false)
             ->assertJsonPath('payment.provider', 'tiptop')
             ->assertJsonPath('payment.required', true)
             ->assertJsonPath('payment.public_id', 'pk_test_public')
-            ->assertJsonPath('payment.amount', 2500);
+            ->assertJsonPath('payment.amount', 2500)
+            ->assertJsonPath('coffee_screen', null)
+            ->assertJsonPath('cart.is_empty', false)
+            ->assertJsonPath('cart.totals.total', 2500);
 
         $this->assertDatabaseHas('orders', [
             'establishment_id' => $establishment->id,
             'payment_status' => PaymentStatus::Pending->value,
             'payment_provider' => 'tiptop',
             'paid_at' => null,
+            'accepted_at' => null,
         ]);
+
+        $this->getJson("/api/establishments/{$establishment->id}/menu")
+            ->assertOk()
+            ->assertJsonPath('cart.items_count', 1)
+            ->assertJsonPath('active_order', null);
     }
 
     public function test_charge_rejects_ice_arena_venue_order(): void
@@ -170,6 +180,13 @@ class TipTopPayApiTest extends TestCase
 
         Sanctum::actingAs($user);
 
+        // Seed a cart so charge can clear it after payment.
+        $this->postJson("/api/establishments/{$order->establishment_id}/cart/items", [
+            'product_id' => $order->items->first()->product_id,
+            'size_id' => ProductSize::query()->where('product_id', $order->items->first()->product_id)->value('id'),
+            'quantity' => 1,
+        ])->assertOk();
+
         $this->postJson("/api/orders/{$order->id}/payments/charge", [
             'cryptogram' => str_repeat('A', 40),
             'name' => 'TEST USER',
@@ -177,13 +194,19 @@ class TipTopPayApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('order.payment_status', 'paid')
             ->assertJsonPath('order.payment_label', 'Visa · 4242')
-            ->assertJsonPath('payment.required', false);
+            ->assertJsonPath('order.is_active', true)
+            ->assertJsonPath('payment.required', false)
+            ->assertJsonPath('cart.is_empty', true)
+            ->assertJsonPath('coffee_screen.screen', 'accepted');
 
         $this->assertDatabaseHas('orders', [
             'id' => $order->id,
             'payment_status' => PaymentStatus::Paid->value,
             'tiptop_transaction_id' => 555001,
         ]);
+
+        $this->assertNotNull($order->fresh()->paid_at);
+        $this->assertNotNull($order->fresh()->accepted_at);
     }
 
     public function test_charge_rejects_ticket_order(): void
@@ -333,6 +356,8 @@ class TipTopPayApiTest extends TestCase
             'payment_provider' => 'tiptop',
             'payment_label' => null,
             'paid_at' => null,
+            'accepted_at' => null,
+            'preparing_at' => null,
         ]);
 
         OrderItem::factory()->create([

@@ -144,13 +144,22 @@ class Order extends Model
 
     public const PREPARING_AFTER_SECONDS = 3;
 
+    public function isAwaitingPayment(): bool
+    {
+        return $this->payment_status?->canCharge() ?? false;
+    }
+
     public function promoteToPreparingIfDue(): void
     {
         if ($this->type !== OrderType::Venue || $this->status !== OrderStatus::Accepted) {
             return;
         }
 
-        $acceptedAt = $this->accepted_at ?? $this->created_at;
+        if ($this->isAwaitingPayment() || blank($this->paid_at)) {
+            return;
+        }
+
+        $acceptedAt = $this->accepted_at ?? $this->paid_at ?? $this->created_at;
 
         if ($acceptedAt === null || $acceptedAt->gt(now()->subSeconds(self::PREPARING_AFTER_SECONDS))) {
             return;
@@ -188,6 +197,10 @@ class Order extends Model
     public function coffeeScreenKey(): ?string
     {
         if ($this->type !== OrderType::Venue) {
+            return null;
+        }
+
+        if ($this->isAwaitingPayment() || blank($this->paid_at)) {
             return null;
         }
 
@@ -255,6 +268,10 @@ class Order extends Model
             $sessionStart = $this->sessionStartsAt();
 
             return $sessionStart === null || $sessionStart->copy()->addHour()->isFuture();
+        }
+
+        if ($this->isAwaitingPayment() || blank($this->paid_at)) {
+            return false;
         }
 
         return $this->status->isActive($this->type);

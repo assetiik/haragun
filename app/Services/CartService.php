@@ -163,6 +163,10 @@ class CartService
                 'image_url' => $item->product->image_url,
             ])->all();
 
+            if ($awaitingPayment) {
+                $this->abandonUnpaidCoffeeOrders((int) $cart->user_id, (int) $cart->establishment_id);
+            }
+
             $order = Order::query()->create([
                 'user_id' => $cart->user_id,
                 'establishment_id' => $cart->establishment_id,
@@ -188,7 +192,7 @@ class CartService
                 'points_to_earn' => (int) floor($subtotal / 20),
                 'prep_minutes' => 15,
                 'paid_at' => $awaitingPayment ? null : $now,
-                'accepted_at' => $now,
+                'accepted_at' => $awaitingPayment ? null : $now,
                 'preparing_at' => null,
                 'ready_at' => null,
                 'completed_at' => null,
@@ -212,7 +216,10 @@ class CartService
                 ]);
             }
 
-            $cart->items()->delete();
+            // TipTop: keep cart until payment succeeds. Mock/Kaspi path clears immediately.
+            if (! $awaitingPayment) {
+                $cart->items()->delete();
+            }
 
             return $order->load(['items.product', 'establishment', 'feedback', 'user']);
         });
@@ -221,6 +228,32 @@ class CartService
             'order' => $order,
             'cart' => $this->load($cart->refresh()),
         ];
+    }
+
+    public function clearForEstablishment(User $user, Establishment $establishment): Cart
+    {
+        $cart = $this->getOrCreate($user, $establishment);
+        $cart->items()->delete();
+
+        return $this->load($cart->refresh());
+    }
+
+    private function abandonUnpaidCoffeeOrders(int $userId, int $establishmentId): void
+    {
+        Order::query()
+            ->where('user_id', $userId)
+            ->where('establishment_id', $establishmentId)
+            ->where('type', OrderType::Venue->value)
+            ->where('payment_provider', 'tiptop')
+            ->whereIn('payment_status', [
+                PaymentStatus::Pending->value,
+                PaymentStatus::Failed->value,
+            ])
+            ->whereNull('paid_at')
+            ->update([
+                'status' => OrderStatus::Cancelled->value,
+                'payment_status' => PaymentStatus::Failed->value,
+            ]);
     }
 
     /**
@@ -245,6 +278,14 @@ class CartService
                 OrderStatus::Preparing->value,
                 OrderStatus::Ready->value,
             ])
+            ->where(function ($query): void {
+                $query->whereNull('payment_status')
+                    ->orWhereNotIn('payment_status', [
+                        PaymentStatus::Pending->value,
+                        PaymentStatus::Failed->value,
+                    ]);
+            })
+            ->whereNotNull('paid_at')
             ->latest('id')
             ->first();
 

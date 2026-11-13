@@ -6,6 +6,7 @@ use App\Enums\EstablishmentType;
 use App\Enums\OrderType;
 use App\Enums\PaymentStatus;
 use App\Exceptions\TipTopPayException;
+use App\Models\Cart;
 use App\Models\Order;
 use App\Models\User;
 use App\Services\Iiko\IikoCatalog;
@@ -271,18 +272,31 @@ class TipTopPayService
 
             $this->syncGatewayFields($locked, $gatewayPayload);
 
+            $now = now();
+
             $locked->forceFill([
                 'payment_status' => PaymentStatus::Paid,
                 'payment_provider' => 'tiptop',
-                'paid_at' => $locked->paid_at ?? now(),
-                'accepted_at' => $locked->accepted_at ?? now(),
+                'paid_at' => $locked->paid_at ?? $now,
+                'accepted_at' => $locked->accepted_at ?? $now,
                 'payment_label' => $this->paymentLabelFromGateway($gatewayPayload) ?? $locked->payment_label,
             ])->save();
 
             $this->finalizeExternalFulfillment($locked);
+            $this->clearCartAfterPayment($locked);
 
             return $locked->fresh(['establishment', 'items.product', 'feedback', 'user']) ?? $locked;
         });
+    }
+
+    private function clearCartAfterPayment(Order $order): void
+    {
+        $cart = Cart::query()
+            ->where('user_id', $order->user_id)
+            ->where('establishment_id', $order->establishment_id)
+            ->first();
+
+        $cart?->items()->delete();
     }
 
     /**
