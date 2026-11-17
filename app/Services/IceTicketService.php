@@ -4,11 +4,13 @@ namespace App\Services;
 
 use App\Enums\ProductKind;
 use App\Exceptions\RinkApiException;
+use App\Exceptions\TipTopPayException;
 use App\Models\Establishment;
 use App\Models\Order;
 use App\Models\User;
 use App\Services\RinkApi\RinkApiCatalog;
 use App\Services\RinkApi\RinkApiClient;
+use App\Services\TipTopPay\TipTopPayService;
 use Illuminate\Validation\ValidationException;
 
 class IceTicketService
@@ -16,6 +18,7 @@ class IceTicketService
     public function __construct(
         private RinkApiCatalog $rink,
         private RinkApiClient $rinkClient,
+        private TipTopPayService $tipTopPay,
     ) {}
 
     /**
@@ -57,10 +60,18 @@ class IceTicketService
         $ticket = $this->rinkClient->refundTicket($barcode, $payload);
         $refundedAmount = (int) ($ticket['price'] ?? $this->localPassPrice($order, $barcode));
 
+        try {
+            $this->tipTopPay->refundOrderAmount($order, $refundedAmount);
+        } catch (TipTopPayException $exception) {
+            throw ValidationException::withMessages([
+                'barcode' => [$exception->getMessage()],
+            ]);
+        }
+
         $order->load(['establishment', 'items.product', 'feedback']);
 
         return [
-            'order' => $order,
+            'order' => $order->fresh(['establishment', 'items.product', 'feedback']) ?? $order,
             'ticket' => $ticket,
             'refunded_amount' => $refundedAmount,
         ];

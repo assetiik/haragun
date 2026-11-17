@@ -34,5 +34,12 @@
         <env name="NIGHTWATCH_ENABLED" value="false"/>
         <env name="OTP_STATIC_CODE" value="1234"/>
         <env name="MOBIZON_API_KEY" value=""/>
+        <env name="TIPTOP_PAY_ENABLED" value="false"/>
+        <env name="TIPTOP_PAY_PUBLIC_ID" value=""/>
+        <env name="TIPTOP_PAY_API_SECRET" value=""/>
+        <env name="TIPTOP_PAY_ICE_PUBLIC_ID" value=""/>
+        <env name="TIPTOP_PAY_ICE_API_SECRET" value=""/>
+        <env name="TIPTOP_PAY_COFFEE_PUBLIC_ID" value=""/>
+        <env name="TIPTOP_PAY_COFFEE_API_SECRET" value=""/>
     </php>
 </phpunit>

@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Enums\EstablishmentType;
 use App\Enums\OrderStatus;
 use App\Enums\OrderType;
 use App\Enums\PaymentMethod;
@@ -145,8 +144,7 @@ class CartService
         }
 
         $cart->loadMissing('establishment');
-        $awaitingPayment = $this->tipTopPay->isEnabled()
-            && $cart->establishment?->type === EstablishmentType::Coffee;
+        $awaitingPayment = $this->tipTopPay->isEnabledForType($cart->establishment?->type);
 
         $order = DB::transaction(function () use ($cart, $paymentLabel, $awaitingPayment) {
             $number = $this->nextNumber();
@@ -164,7 +162,7 @@ class CartService
             ])->all();
 
             if ($awaitingPayment) {
-                $this->abandonUnpaidCoffeeOrders((int) $cart->user_id, (int) $cart->establishment_id);
+                $this->abandonUnpaidTipTopOrders((int) $cart->user_id, (int) $cart->establishment_id);
             }
 
             $order = Order::query()->create([
@@ -238,7 +236,7 @@ class CartService
         return $this->load($cart->refresh());
     }
 
-    private function abandonUnpaidCoffeeOrders(int $userId, int $establishmentId): void
+    private function abandonUnpaidTipTopOrders(int $userId, int $establishmentId): void
     {
         Order::query()
             ->where('user_id', $userId)

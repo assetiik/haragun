@@ -24,17 +24,19 @@ class TipTopPay3dsValidationTest extends TestCase
         config([
             'services.tiptop_pay.enabled' => true,
             'services.tiptop_pay.base_url' => 'https://api.tiptoppay.test',
-            'services.tiptop_pay.public_id' => 'pk_test_public',
-            'services.tiptop_pay.api_secret' => 'test_api_secret',
+            'services.tiptop_pay.merchants.ice.public_id' => 'pk_ice_test',
+            'services.tiptop_pay.merchants.ice.api_secret' => 'ice_api_secret',
+            'services.tiptop_pay.merchants.coffee.public_id' => 'pk_coffee_test',
+            'services.tiptop_pay.merchants.coffee.api_secret' => 'coffee_api_secret',
         ]);
 
         $user = User::factory()->create();
-        $coffee = Establishment::factory()->create([
-            'type' => EstablishmentType::Coffee,
+        $arena = Establishment::factory()->create([
+            'type' => EstablishmentType::IceArena,
         ]);
         $order = Order::factory()->create([
             'user_id' => $user->id,
-            'establishment_id' => $coffee->id,
+            'establishment_id' => $arena->id,
             'type' => OrderType::Venue,
             'status' => OrderStatus::Accepted,
             'total' => 10,

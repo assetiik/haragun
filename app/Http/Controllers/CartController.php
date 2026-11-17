@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\EstablishmentType;
 use App\Enums\PaymentMethod;
 use App\Http\Requests\AddCartItemRequest;
 use App\Http\Requests\CheckoutCartRequest;
@@ -90,14 +91,15 @@ class CartController extends Controller
         $result = $this->carts->checkout($cart, $request->validated('payment_label'));
         $payment = $this->payments->paymentPayload($result['order']);
         $awaitingPayment = is_array($payment) && ($payment['required'] ?? false);
+        $order = $result['order']->loadMissing('establishment');
 
         return response()->json([
-            'order' => new OrderDetailResource($result['order']),
+            'order' => new OrderDetailResource($order),
             'payment' => $payment,
-            // Coffee screen only after payment — pending TipTop must not look "accepted".
-            'coffee_screen' => $awaitingPayment
-                ? null
-                : new OrderCoffeeScreenResource($result['order']),
+            // Coffee post-checkout screen is only for standalone coffee shops.
+            'coffee_screen' => (! $awaitingPayment && $order->establishment?->type === EstablishmentType::Coffee)
+                ? new OrderCoffeeScreenResource($order)
+                : null,
             'cart' => new CartResource($result['cart']),
         ], 201);
     }

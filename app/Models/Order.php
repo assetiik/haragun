@@ -260,6 +260,10 @@ class Order extends Model
 
     public function isActive(): bool
     {
+        if ($this->isAwaitingPayment() || blank($this->paid_at)) {
+            return false;
+        }
+
         if ($this->type === OrderType::Tickets) {
             if ($this->status === OrderStatus::Cancelled || $this->status === OrderStatus::Completed) {
                 return false;
@@ -268,10 +272,6 @@ class Order extends Model
             $sessionStart = $this->sessionStartsAt();
 
             return $sessionStart === null || $sessionStart->copy()->addHour()->isFuture();
-        }
-
-        if ($this->isAwaitingPayment() || blank($this->paid_at)) {
-            return false;
         }
 
         return $this->status->isActive($this->type);

@@ -3,13 +3,12 @@
 namespace App\Services\TipTopPay;
 
 use App\Enums\EstablishmentType;
-use App\Enums\OrderType;
 use App\Enums\PaymentStatus;
 use App\Exceptions\TipTopPayException;
 use App\Models\Cart;
 use App\Models\Order;
 use App\Models\User;
-use App\Services\Iiko\IikoCatalog;
+use App\Services\OrderService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -19,7 +18,6 @@ class TipTopPayService
 {
     public function __construct(
         private TipTopPayClient $client,
-        private IikoCatalog $iiko,
     ) {}
 
     public function isEnabled(): bool
@@ -27,12 +25,24 @@ class TipTopPayService
         return (bool) config('services.tiptop_pay.enabled') && $this->client->isConfigured();
     }
 
+    public function isEnabledForType(?EstablishmentType $type): bool
+    {
+        if (! (bool) config('services.tiptop_pay.enabled')) {
+            return false;
+        }
+
+        $merchant = $this->client->merchantForType($type);
+
+        return $merchant !== null && $this->client->isConfigured($merchant);
+    }
+
     public function appliesTo(Order $order): bool
     {
         $order->loadMissing('establishment');
 
-        return $order->type === OrderType::Venue
-            && $order->establishment?->type === EstablishmentType::Coffee;
+        $merchant = $this->client->merchantForOrder($order);
+
+        return $merchant !== null && $this->client->isConfigured($merchant);
     }
 
     /**
@@ -48,11 +58,17 @@ class TipTopPayService
             return null;
         }
 
+        $merchant = $this->client->merchantForOrder($order);
+
+        if ($merchant === null) {
+            return null;
+        }
+
         return [
             'provider' => 'tiptop',
             'required' => $order->payment_status?->canCharge() ?? false,
             'status' => $order->payment_status?->value ?? PaymentStatus::Pending->value,
-            'public_id' => $this->client->publicId(),
+            'public_id' => $this->client->publicId($merchant),
             'amount' => $order->total,
             'currency' => 'KZT',
             'invoice_id' => (string) $order->id,
@@ -69,11 +85,7 @@ class TipTopPayService
     {
         $this->assertOwnedPayableOrder($user, $order);
 
-        if (! $this->isEnabled()) {
-            throw ValidationException::withMessages([
-                'payment' => ['Оплата через TipTop Pay отключена.'],
-            ]);
-        }
+        $merchant = $this->requireMerchant($order);
 
         $response = $this->client->chargeCard([
             'Amount' => $order->total,
@@ -85,7 +97,7 @@ class TipTopPayService
             'Description' => $order->summary_title ?: ('Заказ '.$order->code),
             'AccountId' => (string) $user->id,
             'CultureName' => 'ru-RU',
-        ]);
+        ], $merchant);
 
         return $this->handleChargeResponse($order, $response);
     }
@@ -97,10 +109,12 @@ class TipTopPayService
     {
         $this->assertOwnedPayableOrder($user, $order);
 
+        $merchant = $this->requireMerchant($order);
+
         $response = $this->client->post3ds([
             'TransactionId' => $transactionId,
             'PaRes' => $paRes,
-        ]);
+        ], $merchant);
 
         return $this->handleChargeResponse($order, $response);
     }
@@ -224,11 +238,16 @@ class TipTopPayService
         }
 
         $refundAmount = min($amount, $remaining);
+        $merchant = $this->client->merchantForOrder($order);
+
+        if ($merchant === null) {
+            return;
+        }
 
         $response = $this->client->refund([
             'TransactionId' => (int) $order->tiptop_transaction_id,
             'Amount' => $refundAmount,
-        ]);
+        ], $merchant);
 
         if (($response['Success'] ?? false) !== true) {
             throw new TipTopPayException(
@@ -356,30 +375,8 @@ class TipTopPayService
     private function finalizeExternalFulfillment(Order $order): void
     {
         try {
-            if (
-                $order->type === OrderType::Venue
-                && blank($order->iiko_order_id)
-                && $order->establishment
-                && $this->iiko->usesIiko($order->establishment)
-            ) {
-                $order->loadMissing(['items.product', 'user']);
-                $lines = $order->items->map(fn ($item): array => [
-                    'product_id' => $item->product_id,
-                    'name' => $item->name,
-                    'quantity' => $item->quantity,
-                    'unit_price' => $item->unit_price,
-                    'amount' => $item->amount,
-                    'kind' => $item->kind,
-                    'is_discount' => $item->is_discount,
-                    'sizes' => $item->sizes ?? [],
-                ])->all();
-
-                $iikoOrder = $this->iiko->createVenueOrder($order, $order->user, $lines);
-                $order->forceFill([
-                    'iiko_order_id' => $iikoOrder['orderId'],
-                    'iiko_correlation_id' => $iikoOrder['correlationId'] ?: null,
-                ])->save();
-            }
+            // Lazy resolve avoids a constructor cycle with OrderService.
+            app(OrderService::class)->fulfillAfterPayment($order);
         } catch (Throwable $exception) {
             Log::error('TipTop Pay: не удалось финализировать заказ после оплаты', [
                 'order_id' => $order->id,
@@ -467,7 +464,7 @@ class TipTopPayService
 
         if (! $this->appliesTo($order)) {
             throw ValidationException::withMessages([
-                'payment' => ['TipTop Pay доступен только для отдельных кофеен.'],
+                'payment' => ['TipTop Pay недоступен для этого заказа.'],
             ]);
         }
 
@@ -476,5 +473,24 @@ class TipTopPayService
                 'payment' => ['Этот заказ уже оплачен или недоступен для оплаты.'],
             ]);
         }
+    }
+
+    private function requireMerchant(Order $order): string
+    {
+        if (! (bool) config('services.tiptop_pay.enabled')) {
+            throw ValidationException::withMessages([
+                'payment' => ['Оплата через TipTop Pay отключена.'],
+            ]);
+        }
+
+        $merchant = $this->client->merchantForOrder($order);
+
+        if ($merchant === null || ! $this->client->isConfigured($merchant)) {
+            throw ValidationException::withMessages([
+                'payment' => ['Оплата через TipTop Pay отключена.'],
+            ]);
+        }
+
+        return $merchant;
     }
 }

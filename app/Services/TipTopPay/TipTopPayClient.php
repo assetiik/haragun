@@ -2,7 +2,9 @@
 
 namespace App\Services\TipTopPay;
 
+use App\Enums\EstablishmentType;
 use App\Exceptions\TipTopPayException;
+use App\Models\Order;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
@@ -11,80 +13,130 @@ use Throwable;
 
 class TipTopPayClient
 {
-    public function isConfigured(): bool
+    public const MERCHANT_ICE = 'ice';
+
+    public const MERCHANT_COFFEE = 'coffee';
+
+    public function merchantForOrder(Order $order): ?string
     {
-        return filled(config('services.tiptop_pay.public_id'))
-            && filled(config('services.tiptop_pay.api_secret'));
+        $order->loadMissing('establishment');
+
+        return match ($order->establishment?->type) {
+            EstablishmentType::IceArena => self::MERCHANT_ICE,
+            EstablishmentType::Coffee => self::MERCHANT_COFFEE,
+            default => null,
+        };
     }
 
-    public function publicId(): string
+    public function merchantForType(?EstablishmentType $type): ?string
     {
-        return (string) config('services.tiptop_pay.public_id');
+        return match ($type) {
+            EstablishmentType::IceArena => self::MERCHANT_ICE,
+            EstablishmentType::Coffee => self::MERCHANT_COFFEE,
+            default => null,
+        };
     }
 
-    public function apiSecret(): string
+    public function isConfigured(?string $merchant = null): bool
     {
-        return (string) config('services.tiptop_pay.api_secret');
+        if ($merchant === null) {
+            return $this->isConfigured(self::MERCHANT_ICE)
+                || $this->isConfigured(self::MERCHANT_COFFEE);
+        }
+
+        return filled($this->publicId($merchant)) && filled($this->apiSecret($merchant));
+    }
+
+    public function publicId(string $merchant): string
+    {
+        return (string) config("services.tiptop_pay.merchants.{$merchant}.public_id");
+    }
+
+    public function apiSecret(string $merchant): string
+    {
+        return (string) config("services.tiptop_pay.merchants.{$merchant}.api_secret");
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function configuredSecrets(): array
+    {
+        $secrets = [];
+
+        foreach ([self::MERCHANT_ICE, self::MERCHANT_COFFEE] as $merchant) {
+            if ($this->isConfigured($merchant)) {
+                $secrets[] = $this->apiSecret($merchant);
+            }
+        }
+
+        return array_values(array_unique($secrets));
     }
 
     /**
      * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */
-    public function chargeCard(array $payload): array
+    public function chargeCard(array $payload, string $merchant): array
     {
-        return $this->jsonObject($this->send('POST', '/payments/cards/charge', $payload));
+        return $this->jsonObject($this->send('POST', '/payments/cards/charge', $payload, $merchant));
     }
 
     /**
      * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */
-    public function post3ds(array $payload): array
+    public function post3ds(array $payload, string $merchant): array
     {
-        return $this->jsonObject($this->send('POST', '/payments/cards/post3ds', $payload));
+        return $this->jsonObject($this->send('POST', '/payments/cards/post3ds', $payload, $merchant));
     }
 
     /**
      * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */
-    public function refund(array $payload): array
+    public function refund(array $payload, string $merchant): array
     {
-        return $this->jsonObject($this->send('POST', '/payments/refund', $payload));
+        return $this->jsonObject($this->send('POST', '/payments/refund', $payload, $merchant));
     }
 
     /**
      * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */
-    public function getPayment(array $payload): array
+    public function getPayment(array $payload, string $merchant): array
     {
-        return $this->jsonObject($this->send('POST', '/payments/get', $payload));
+        return $this->jsonObject($this->send('POST', '/payments/get', $payload, $merchant));
     }
 
     public function verifyNotificationHmac(string $rawBody, ?string $contentHmac): bool
     {
-        if (! filled($contentHmac) || ! $this->isConfigured()) {
+        if (! filled($contentHmac)) {
             return false;
         }
 
-        $expected = base64_encode(hash_hmac('sha256', $rawBody, $this->apiSecret(), true));
+        foreach ($this->configuredSecrets() as $secret) {
+            $expected = base64_encode(hash_hmac('sha256', $rawBody, $secret, true));
 
-        return hash_equals($expected, $contentHmac);
+            if (hash_equals($expected, $contentHmac)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
      * @param  array<string, mixed>  $payload
      */
-    private function send(string $method, string $path, array $payload = []): Response
+    private function send(string $method, string $path, array $payload, string $merchant): Response
     {
-        if (! $this->isConfigured()) {
+        if (! $this->isConfigured($merchant)) {
             throw new TipTopPayException('TipTop Pay не настроен.', 503, 'tiptop_not_configured', path: $path);
         }
 
         try {
-            $response = $this->http()->send($method, $path, [
+            $response = $this->http($merchant)->send($method, $path, [
                 'json' => $payload,
             ]);
         } catch (ConnectionException $exception) {
@@ -126,12 +178,12 @@ class TipTopPayClient
         return $response;
     }
 
-    private function http(): PendingRequest
+    private function http(string $merchant): PendingRequest
     {
         return Http::baseUrl(rtrim((string) config('services.tiptop_pay.base_url'), '/'))
             ->acceptJson()
             ->asJson()
-            ->withBasicAuth($this->publicId(), $this->apiSecret())
+            ->withBasicAuth($this->publicId($merchant), $this->apiSecret($merchant))
             ->connectTimeout((int) config('services.tiptop_pay.connect_timeout', 3))
             ->timeout((int) config('services.tiptop_pay.timeout', 30));
     }

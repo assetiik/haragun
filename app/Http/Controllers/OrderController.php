@@ -9,6 +9,7 @@ use App\Http\Resources\OrderListResource;
 use App\Models\Order;
 use App\Services\IceTicketService;
 use App\Services\OrderService;
+use App\Services\TipTopPay\TipTopPayService;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -19,6 +20,7 @@ class OrderController extends Controller
     public function __construct(
         private OrderService $orders,
         private IceTicketService $iceTickets,
+        private TipTopPayService $payments,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -75,10 +77,15 @@ class OrderController extends Controller
     public function store(StoreOrderRequest $request): JsonResponse
     {
         $order = $this->orders->create($request->user(), $request->validated());
-        $request->attributes->set('rink_tickets', $this->iceTickets->remoteTicketsByCode($order));
+        $payment = $this->payments->paymentPayload($order);
+
+        if (! is_array($payment) || ! ($payment['required'] ?? false)) {
+            $request->attributes->set('rink_tickets', $this->iceTickets->remoteTicketsByCode($order));
+        }
 
         return response()->json([
             'order' => new OrderDetailResource($order),
+            'payment' => $payment,
         ], 201);
     }
 

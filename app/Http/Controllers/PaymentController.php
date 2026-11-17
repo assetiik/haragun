@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\EstablishmentType;
 use App\Http\Requests\ChargeOrderPaymentRequest;
 use App\Http\Requests\CompleteOrder3dsRequest;
 use App\Http\Resources\CartResource;
@@ -60,7 +61,9 @@ class PaymentController extends Controller
         $payload = [
             'order' => new OrderDetailResource($order),
             'payment' => $result['payment'],
-            'coffee_screen' => $paid ? new OrderCoffeeScreenResource($order) : null,
+            'coffee_screen' => ($paid && $order->establishment?->type === EstablishmentType::Coffee)
+                ? new OrderCoffeeScreenResource($order)
+                : null,
             'cart' => $order->establishment !== null && $order->user !== null
                 ? new CartResource($this->carts->load(
                     $this->carts->getOrCreate($order->user, $order->establishment)

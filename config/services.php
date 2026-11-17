@@ -80,8 +80,19 @@ return [
     'tiptop_pay' => [
         'enabled' => (bool) env('TIPTOP_PAY_ENABLED', false),
         'base_url' => env('TIPTOP_PAY_BASE_URL', 'https://api.tiptoppay.kz'),
+        // Legacy shared keys remain as fallback when merchant-specific keys are empty.
         'public_id' => env('TIPTOP_PAY_PUBLIC_ID'),
         'api_secret' => env('TIPTOP_PAY_API_SECRET'),
+        'merchants' => [
+            'ice' => [
+                'public_id' => env('TIPTOP_PAY_ICE_PUBLIC_ID', env('TIPTOP_PAY_PUBLIC_ID')),
+                'api_secret' => env('TIPTOP_PAY_ICE_API_SECRET', env('TIPTOP_PAY_API_SECRET')),
+            ],
+            'coffee' => [
+                'public_id' => env('TIPTOP_PAY_COFFEE_PUBLIC_ID', env('TIPTOP_PAY_PUBLIC_ID')),
+                'api_secret' => env('TIPTOP_PAY_COFFEE_API_SECRET', env('TIPTOP_PAY_API_SECRET')),
+            ],
+        ],
         'connect_timeout' => 3,
         'timeout' => 30,
     ],

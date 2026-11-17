@@ -15,6 +15,7 @@ use App\Services\DssSoft\DssSoftClient;
 use App\Services\Iiko\IikoCatalog;
 use App\Services\RinkApi\RinkApiCatalog;
 use App\Services\RinkApi\RinkApiClient;
+use App\Services\TipTopPay\TipTopPayService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -29,6 +30,7 @@ class OrderService
         private RinkApiCatalog $rink,
         private RinkApiClient $rinkClient,
         private IikoCatalog $iiko,
+        private TipTopPayService $tipTopPay,
     ) {}
 
     /**
@@ -49,6 +51,8 @@ class OrderService
         $ticketLines = collect($quote['lines'])
             ->filter(fn (array $line): bool => $line['kind'] === ProductKind::Ticket->value && ! $line['is_discount']);
 
+        $awaitingPayment = $this->tipTopPay->isEnabledForType($establishment->type);
+
         $slot = null;
         $session = null;
         $dssHold = null;
@@ -57,6 +61,10 @@ class OrderService
         $confirmed = false;
 
         try {
+            if ($awaitingPayment) {
+                $this->abandonUnpaidTipTopOrders((int) $user->id, (int) $establishment->id);
+            }
+
             if ($type === OrderType::Tickets && $this->rink->usesRink($establishment) && $ticketLines->isNotEmpty()) {
                 $session = $this->rink->resolveSession($payload['date'], $payload['time']);
                 $rinkHold = $this->rinkClient->createOrder($this->rinkOrderPayload(
@@ -69,7 +77,7 @@ class OrderService
                 $dssHold = $this->dssClient->createOrder($this->dssOrderPayload($user, $ticketLines->all(), $slot));
             }
 
-            $order = DB::transaction(function () use ($user, $payload, $quote, $type, $slot, $session, $dssHold, $rinkHold) {
+            $order = DB::transaction(function () use ($user, $payload, $quote, $type, $slot, $session, $dssHold, $rinkHold, $awaitingPayment) {
                 $number = $this->nextNumber();
                 $now = now();
                 $sessionEnds = $session['ends_at'] ?? $slot['ends_at'] ?? $this->sessionEndsAt($payload['time']);
@@ -99,15 +107,17 @@ class OrderService
                     'items_count' => $quote['items_count'],
                     'summary_title' => $this->summaryTitle($quote['lines']),
                     'summary_short' => $this->summaryShort($quote['lines']),
-                    'payment_label' => $payload['payment_label'] ?? 'Kaspi Gold · 4417',
-                    'payment_status' => PaymentStatus::Paid,
-                    'payment_provider' => null,
+                    'payment_label' => $awaitingPayment
+                        ? null
+                        : ($payload['payment_label'] ?? 'Kaspi Gold · 4417'),
+                    'payment_status' => $awaitingPayment ? PaymentStatus::Pending : PaymentStatus::Paid,
+                    'payment_provider' => $awaitingPayment ? 'tiptop' : null,
                     'promo_code' => $quote['promo_code'] ?? null,
                     'promo_discount' => (int) ($quote['promo_discount'] ?? 0),
                     'points_to_earn' => (int) floor($quote['total'] / 20),
                     'prep_minutes' => $type === OrderType::Venue ? 5 : null,
-                    'paid_at' => $now,
-                    'accepted_at' => $now,
+                    'paid_at' => $awaitingPayment ? null : $now,
+                    'accepted_at' => $awaitingPayment ? null : $now,
                     'preparing_at' => null,
                     'ready_at' => null,
                     'completed_at' => null,
@@ -134,6 +144,11 @@ class OrderService
 
                 return $order;
             });
+
+            // TipTop: keep rink/dss holds and confirm only after payment.
+            if ($awaitingPayment) {
+                return $order->load(['items', 'establishment']);
+            }
 
             if (is_array($rinkHold) && isset($rinkHold['order_id'])) {
                 $confirmedOrder = $this->rinkClient->confirmOrder((string) $rinkHold['order_id']);
@@ -188,6 +203,125 @@ class OrderService
 
             throw $exception;
         }
+    }
+
+    public function fulfillAfterPayment(Order $order): void
+    {
+        $order->loadMissing(['establishment', 'items.product', 'user']);
+
+        if ($order->type === OrderType::Tickets && filled($order->rink_order_id) && ! $this->hasTicketBarcodes($order)) {
+            $confirmedOrder = $this->rinkClient->confirmOrder((string) $order->rink_order_id);
+            $this->attachRinkBarcodes($order, $confirmedOrder, $this->ticketLinesFromOrder($order));
+        } elseif ($order->type === OrderType::Tickets && filled($order->dss_order_id) && ! $this->hasTicketBarcodes($order)) {
+            $dssOrder = $this->dssClient->confirmOrder((int) $order->dss_order_id);
+            $this->attachBarcodes($order, $dssOrder, $this->ticketLinesFromOrder($order));
+        }
+
+        if (
+            $order->type === OrderType::Venue
+            && blank($order->iiko_order_id)
+            && $order->establishment
+            && $this->iiko->usesIiko($order->establishment)
+        ) {
+            $lines = $order->items->map(fn (OrderItem $item): array => [
+                'product_id' => $item->product_id,
+                'name' => $item->name,
+                'quantity' => $item->quantity,
+                'unit_price' => $item->unit_price,
+                'amount' => $item->amount,
+                'kind' => $item->kind,
+                'is_discount' => $item->is_discount,
+                'sizes' => $item->sizes ?? [],
+            ])->all();
+
+            $iikoOrder = $this->iiko->createVenueOrder($order, $order->user, $lines);
+            $order->forceFill([
+                'iiko_order_id' => $iikoOrder['orderId'],
+                'iiko_correlation_id' => $iikoOrder['correlationId'] ?: null,
+            ])->save();
+        }
+    }
+
+    private function abandonUnpaidTipTopOrders(int $userId, int $establishmentId): void
+    {
+        $orders = Order::query()
+            ->where('user_id', $userId)
+            ->where('establishment_id', $establishmentId)
+            ->where('payment_provider', 'tiptop')
+            ->whereIn('payment_status', [
+                PaymentStatus::Pending->value,
+                PaymentStatus::Failed->value,
+            ])
+            ->whereNull('paid_at')
+            ->get();
+
+        foreach ($orders as $order) {
+            $this->releaseUnpaidExternalHold($order);
+            $order->forceFill([
+                'status' => OrderStatus::Cancelled->value,
+                'payment_status' => PaymentStatus::Failed->value,
+            ])->save();
+        }
+    }
+
+    private function releaseUnpaidExternalHold(Order $order): void
+    {
+        if ($order->type !== OrderType::Tickets || $this->hasTicketBarcodes($order)) {
+            return;
+        }
+
+        if (filled($order->rink_order_id)) {
+            try {
+                $this->rinkClient->releaseOrder((string) $order->rink_order_id);
+            } catch (Throwable $exception) {
+                Log::warning('Не удалось отменить бронь Rink API для неоплаченного заказа', [
+                    'order_id' => $order->id,
+                    'rink_order_id' => $order->rink_order_id,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+        }
+
+        if (filled($order->dss_order_id)) {
+            try {
+                $this->dssClient->cancelOrder((int) $order->dss_order_id);
+            } catch (Throwable $exception) {
+                Log::warning('Не удалось отменить бронь DSS-Soft для неоплаченного заказа', [
+                    'order_id' => $order->id,
+                    'dss_order_id' => $order->dss_order_id,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+        }
+    }
+
+    private function hasTicketBarcodes(Order $order): bool
+    {
+        $order->loadMissing('items');
+
+        return $order->items
+            ->where('kind', ProductKind::Ticket->value)
+            ->contains(fn (OrderItem $item): bool => filled($item->barcodes));
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function ticketLinesFromOrder(Order $order): array
+    {
+        $order->loadMissing('items.product');
+
+        return $order->items
+            ->filter(fn (OrderItem $item): bool => $item->kind === ProductKind::Ticket->value && ! $item->is_discount)
+            ->map(fn (OrderItem $item): array => [
+                'product_id' => $item->product_id,
+                'ticket_type' => $item->product?->ticket_type,
+                'dss_pricegroup_id' => $item->product?->dss_pricegroup_id,
+                'quantity' => $item->quantity,
+                'unit_price' => $item->unit_price,
+            ])
+            ->values()
+            ->all();
     }
 
     /**
