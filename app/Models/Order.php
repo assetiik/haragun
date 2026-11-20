@@ -35,6 +35,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'dss_day_id',
     'dss_slot_id',
     'rink_order_id',
+    'rink_external_order_id',
     'rink_session_id',
     'iiko_order_id',
     'iiko_correlation_id',

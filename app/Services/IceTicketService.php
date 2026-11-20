@@ -4,13 +4,11 @@ namespace App\Services;
 
 use App\Enums\ProductKind;
 use App\Exceptions\RinkApiException;
-use App\Exceptions\TipTopPayException;
 use App\Models\Establishment;
 use App\Models\Order;
 use App\Models\User;
 use App\Services\RinkApi\RinkApiCatalog;
 use App\Services\RinkApi\RinkApiClient;
-use App\Services\TipTopPay\TipTopPayService;
 use Illuminate\Validation\ValidationException;
 
 class IceTicketService
@@ -18,7 +16,6 @@ class IceTicketService
     public function __construct(
         private RinkApiCatalog $rink,
         private RinkApiClient $rinkClient,
-        private TipTopPayService $tipTopPay,
     ) {}
 
     /**
@@ -38,83 +35,39 @@ class IceTicketService
     }
 
     /**
-     * @return array{order: Order, ticket: array<string, mixed>, refunded_amount: int}
+     * Guest refunds are disabled: rink staff only (19 Nov 2026).
+     *
+     * @return never
      */
     public function refund(User $user, Order $order, string $barcode, ?string $reason = null): array
     {
         $this->assertOwnedTicketOrder($user, $order);
         $this->assertBarcodeOnOrder($order, $barcode);
 
-        if (! filled($order->rink_order_id) || ! $this->rinkClient->isConfigured()) {
-            throw ValidationException::withMessages([
-                'barcode' => ['Возврат через билетную систему недоступен для этого заказа.'],
-            ]);
-        }
-
-        $payload = [];
-
-        if (filled($reason)) {
-            $payload['reason'] = $reason;
-        }
-
-        $ticket = $this->rinkClient->refundTicket($barcode, $payload);
-        $refundedAmount = (int) ($ticket['price'] ?? $this->localPassPrice($order, $barcode));
-
-        try {
-            $this->tipTopPay->refundOrderAmount($order, $refundedAmount);
-        } catch (TipTopPayException $exception) {
-            throw ValidationException::withMessages([
-                'barcode' => [$exception->getMessage()],
-            ]);
-        }
-
-        $order->load(['establishment', 'items.product', 'feedback']);
-
-        return [
-            'order' => $order->fresh(['establishment', 'items.product', 'feedback']) ?? $order,
-            'ticket' => $ticket,
-            'refunded_amount' => $refundedAmount,
-        ];
+        throw $this->staffOnlyException(
+            $order,
+            $barcode,
+            'refund_by_staff_only',
+            'Возврат билета оформляют сотрудники катка.',
+        );
     }
 
     /**
-     * @return array{order: Order, ticket: array<string, mixed>}
+     * Guest moves are disabled: rink staff only (19 Nov 2026).
+     *
+     * @return never
      */
     public function move(User $user, Order $order, string $barcode, string $date, string $time): array
     {
         $this->assertOwnedTicketOrder($user, $order);
         $this->assertBarcodeOnOrder($order, $barcode);
 
-        if (! filled($order->rink_order_id) || ! $this->rink->usesRink($order->establishment)) {
-            throw ValidationException::withMessages([
-                'barcode' => ['Перенос через билетную систему недоступен для этого заказа.'],
-            ]);
-        }
-
-        $session = $this->rink->resolveSession($date, $time);
-        $ticket = $this->rinkClient->moveTicket($barcode, [
-            'session_id' => $session['rink_session_id'],
-        ]);
-
-        if ($this->orderHasSingleActiveTicket($order, $barcode)) {
-            $entryOpens = $session['entry_opens_at'] ?? null;
-            $order->forceFill([
-                'rink_session_id' => $session['rink_session_id'],
-                'session_date' => $date,
-                'session_time' => $session['time'].':00',
-                'session_ends_at' => $session['ends_at'].':00',
-                'session_entry_opens_at' => is_string($entryOpens) && strlen($entryOpens) === 5
-                    ? $entryOpens.':00'
-                    : null,
-            ])->save();
-        }
-
-        $order->load(['establishment', 'items.product', 'feedback']);
-
-        return [
-            'order' => $order->fresh(['establishment', 'items.product', 'feedback']),
-            'ticket' => $ticket,
-        ];
+        throw $this->staffOnlyException(
+            $order,
+            $barcode,
+            'move_by_staff_only',
+            'Перенос билета оформляют сотрудники катка.',
+        );
     }
 
     /**
@@ -137,6 +90,47 @@ class IceTicketService
         }
 
         return $map;
+    }
+
+    private function staffOnlyException(
+        Order $order,
+        string $barcode,
+        string $errorCode,
+        string $fallbackPrefix,
+    ): RinkApiException {
+        $staffContact = $this->staffContactForBarcode($order, $barcode);
+
+        $message = filled($staffContact)
+            ? "Чтобы вернуть или перенести билет, свяжитесь с катком: {$staffContact}"
+            : 'Чтобы вернуть или перенести билет, обратитесь к администратору катка.';
+
+        return new RinkApiException(
+            $message,
+            403,
+            $errorCode,
+            [
+                'staff_contact' => $staffContact,
+                'hint' => $fallbackPrefix,
+            ],
+            "/tickets/{$barcode}",
+        );
+    }
+
+    private function staffContactForBarcode(Order $order, string $barcode): string
+    {
+        if (! $this->rinkClient->isConfigured()) {
+            return '';
+        }
+
+        try {
+            $ticket = $this->rinkClient->ticket($barcode);
+
+            return is_string($ticket['staff_contact'] ?? null)
+                ? trim((string) $ticket['staff_contact'])
+                : '';
+        } catch (RinkApiException) {
+            return '';
+        }
     }
 
     private function assertOwnedTicketOrder(User $user, Order $order): void
@@ -183,31 +177,5 @@ class IceTicketService
         }
 
         return $codes;
-    }
-
-    private function localPassPrice(Order $order, string $barcode): int
-    {
-        foreach ($order->items as $item) {
-            if ($item->kind !== ProductKind::Ticket->value || $item->is_discount) {
-                continue;
-            }
-
-            foreach ($item->barcodes ?? [] as $code) {
-                $value = is_array($code) ? (string) ($code['code'] ?? '') : (string) $code;
-
-                if ($value === $barcode) {
-                    return (int) $item->unit_price;
-                }
-            }
-        }
-
-        return 0;
-    }
-
-    private function orderHasSingleActiveTicket(Order $order, string $barcode): bool
-    {
-        $codes = $this->orderBarcodes($order);
-
-        return count($codes) === 1 && ($codes[0] ?? null) === $barcode;
     }
 }

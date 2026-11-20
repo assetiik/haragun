@@ -113,20 +113,21 @@ class OrderDetailResource extends JsonResource
             foreach ($codes as $index => $code) {
                 $remote = is_string($code) && $code !== '' ? ($remoteTickets[$code] ?? null) : null;
                 $status = is_array($remote) ? (string) ($remote['status'] ?? 'active') : (filled($code) ? 'active' : 'pending');
-                $canRefund = is_array($remote)
-                    ? (bool) ($remote['can_refund'] ?? false)
-                    : ($status === 'active');
-                $canMove = is_array($remote)
-                    ? (bool) ($remote['can_move'] ?? false)
-                    : ($status === 'active');
+                $staffContact = is_array($remote) && is_string($remote['staff_contact'] ?? null)
+                    ? trim((string) $remote['staff_contact'])
+                    : '';
 
                 $sessionDate = $this->session_date?->toDateString();
                 $sessionTime = $this->formattedSessionTime();
                 $sessionEnds = $this->formattedSessionEndsAt();
                 $entryOpens = $this->passOpensAt()?->format('H:i');
+                $sessionStatus = null;
 
                 if (is_array($remote) && is_array($remote['session'] ?? null)) {
                     $remoteSession = $remote['session'];
+                    $sessionStatus = isset($remoteSession['status'])
+                        ? (string) $remoteSession['status']
+                        : null;
                     $sessionDate = isset($remoteSession['starts_at'])
                         ? Carbon::parse((string) $remoteSession['starts_at'])->toDateString()
                         : $sessionDate;
@@ -141,7 +142,10 @@ class OrderDetailResource extends JsonResource
                         : $entryOpens;
                 }
 
-                $isActive = $status === 'active' && $windowOpen && filled($code);
+                $isActive = $status === 'active'
+                    && $windowOpen
+                    && filled($code)
+                    && ! in_array($sessionStatus, ['cancelled', 'closed'], true);
 
                 $passes[] = [
                     'id' => $item->id.'-'.$index,
@@ -152,13 +156,16 @@ class OrderDetailResource extends JsonResource
                     'ticket_type' => is_array($remote) ? ($remote['ticket_type'] ?? null) : null,
                     'price' => is_array($remote) ? (int) ($remote['price'] ?? $item->unit_price) : $item->unit_price,
                     'full_price' => is_array($remote) ? (int) ($remote['full_price'] ?? $item->unit_price) : $item->unit_price,
-                    'can_refund' => $canRefund && $status === 'active',
-                    'can_move' => $canMove && $status === 'active',
+                    // Guest self-service refund/move disabled (rink staff only, 19 Nov 2026).
+                    'can_refund' => false,
+                    'can_move' => false,
+                    'staff_contact' => $staffContact,
                     'session' => [
                         'date' => $sessionDate,
                         'time' => $sessionTime,
                         'ends_at' => $sessionEnds,
                         'entry_opens_at' => $entryOpens,
+                        'status' => $sessionStatus,
                     ],
                     'valid_from' => $validFrom?->toIso8601String(),
                     'valid_until' => $validUntil?->toIso8601String(),

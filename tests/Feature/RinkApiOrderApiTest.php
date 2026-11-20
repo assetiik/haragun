@@ -6,6 +6,7 @@ use App\Enums\EstablishmentType;
 use App\Enums\ProductKind;
 use App\Models\Establishment;
 use App\Models\MenuCategory;
+use App\Models\Order;
 use App\Models\Product;
 use App\Models\SkateSize;
 use App\Models\User;
@@ -55,9 +56,16 @@ class RinkApiOrderApiTest extends TestCase
             ->assertJsonPath('order.passes.1.barcode', 'BUH4853QM27CP3455D9A')
             ->assertJsonCount(2, 'order.passes');
 
+        $orderId = (int) $response->json('order.id');
+        $externalOrderId = (string) Order::query()->whereKey($orderId)->value('rink_external_order_id');
+
+        $this->assertNotSame('', $externalOrderId);
+        $this->assertTrue(str_starts_with($externalOrderId, 'APP-'));
+
         $this->assertDatabaseHas('orders', [
             'user_id' => $user->id,
             'rink_order_id' => 'ord_test_hold_1',
+            'rink_external_order_id' => $externalOrderId,
             'rink_session_id' => 41,
         ]);
 
@@ -68,7 +76,7 @@ class RinkApiOrderApiTest extends TestCase
             && $request['items'] === [
                 ['ticket_type' => 'adult', 'quantity' => 2, 'unit_price' => 4000],
             ]
-            && str_starts_with((string) $request['external_order_id'], 'APP-'));
+            && $request['external_order_id'] === $externalOrderId);
 
         Http::assertSent(fn (Request $request): bool => $request->method() === 'POST'
             && parse_url($request->url(), PHP_URL_PATH) === '/api/v1/orders/ord_test_hold_1/confirm');

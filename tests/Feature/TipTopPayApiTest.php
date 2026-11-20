@@ -357,6 +357,10 @@ class TipTopPayApiTest extends TestCase
         ])->assertCreated();
 
         $orderId = (int) $create->json('order.id');
+        $externalOrderId = (string) Order::query()->whereKey($orderId)->value('rink_external_order_id');
+
+        $this->assertNotSame('', $externalOrderId);
+        $this->assertSame($externalOrderId, $create->json('order.payment.invoice_id'));
 
         $this->postJson("/api/orders/{$orderId}/payments/charge", [
             'cryptogram' => str_repeat('A', 40),
@@ -369,7 +373,56 @@ class TipTopPayApiTest extends TestCase
             ->assertJsonCount(2, 'order.passes');
 
         Http::assertSent(fn (Request $request): bool => $request->method() === 'POST'
+            && str_contains($request->url(), 'api.tiptoppay.test')
+            && str_contains((string) parse_url($request->url(), PHP_URL_PATH), '/payments/cards/charge')
+            && $request['InvoiceId'] === $externalOrderId
+            && is_array($request['JsonData'] ?? null)
+            && is_array(data_get($request['JsonData'], 'PaymentData.CustomerReceipt.Items')));
+
+        Http::assertSent(fn (Request $request): bool => $request->method() === 'POST'
             && str_contains($request->url(), '/api/v1/orders/ord_test_hold_1/confirm'));
+    }
+
+    public function test_pay_webhook_resolves_ticket_order_by_external_invoice_id(): void
+    {
+        $this->configureTipTop();
+
+        [$user, $order] = $this->seedPendingIceVenueOrder();
+        $order->forceFill([
+            'rink_external_order_id' => 'APP-01jwebhookmatch',
+        ])->save();
+
+        $payload = [
+            'TransactionId' => 888,
+            'Amount' => (string) $order->total,
+            'Currency' => 'KZT',
+            'InvoiceId' => 'APP-01jwebhookmatch',
+            'AccountId' => (string) $user->id,
+            'CardType' => 'Visa',
+            'CardLastFour' => '1111',
+        ];
+        $body = json_encode($payload, JSON_THROW_ON_ERROR);
+
+        $this->call(
+            'POST',
+            '/api/payments/tiptop/pay',
+            [],
+            [],
+            [],
+            [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_CONTENT_HMAC' => $this->hmac($body),
+            ],
+            $body,
+        )
+            ->assertOk()
+            ->assertExactJson(['code' => 0]);
+
+        $this->assertDatabaseHas('orders', [
+            'id' => $order->id,
+            'payment_status' => PaymentStatus::Paid->value,
+            'tiptop_transaction_id' => 888,
+        ]);
     }
 
     public function test_pay_webhook_marks_ice_order_paid(): void

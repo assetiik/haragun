@@ -65,11 +65,15 @@ class OrderService
                 $this->abandonUnpaidTipTopOrders((int) $user->id, (int) $establishment->id);
             }
 
+            $rinkExternalOrderId = null;
+
             if ($type === OrderType::Tickets && $this->rink->usesRink($establishment) && $ticketLines->isNotEmpty()) {
                 $session = $this->rink->resolveSession($payload['date'], $payload['time']);
+                $rinkExternalOrderId = $this->newRinkExternalOrderId();
                 $rinkHold = $this->rinkClient->createOrder($this->rinkOrderPayload(
                     $ticketLines->all(),
                     $session,
+                    $rinkExternalOrderId,
                     $quote['promo_code'] ?? null,
                 ));
             } elseif ($type === OrderType::Tickets && $this->dss->usesDss($establishment) && $ticketLines->isNotEmpty()) {
@@ -77,7 +81,7 @@ class OrderService
                 $dssHold = $this->dssClient->createOrder($this->dssOrderPayload($user, $ticketLines->all(), $slot));
             }
 
-            $order = DB::transaction(function () use ($user, $payload, $quote, $type, $slot, $session, $dssHold, $rinkHold, $awaitingPayment) {
+            $order = DB::transaction(function () use ($user, $payload, $quote, $type, $slot, $session, $dssHold, $rinkHold, $rinkExternalOrderId, $awaitingPayment) {
                 $number = $this->nextNumber();
                 $now = now();
                 $sessionEnds = $session['ends_at'] ?? $slot['ends_at'] ?? $this->sessionEndsAt($payload['time']);
@@ -94,6 +98,7 @@ class OrderService
                     'dss_day_id' => $slot['dss_day_id'] ?? null,
                     'dss_slot_id' => $slot['dss_slot_id'] ?? null,
                     'rink_order_id' => $rinkHold['order_id'] ?? null,
+                    'rink_external_order_id' => $rinkExternalOrderId,
                     'rink_session_id' => $session['rink_session_id'] ?? null,
                     'session_date' => $payload['date'],
                     'session_time' => $payload['time'].':00',
@@ -324,13 +329,22 @@ class OrderService
             ->all();
     }
 
+    private function newRinkExternalOrderId(): string
+    {
+        return 'APP-'.Str::lower((string) Str::ulid());
+    }
+
     /**
      * @param  list<array<string, mixed>>  $ticketLines
      * @param  array{rink_session_id: int}  $session
      * @return array<string, mixed>
      */
-    private function rinkOrderPayload(array $ticketLines, array $session, ?string $promoCode = null): array
-    {
+    private function rinkOrderPayload(
+        array $ticketLines,
+        array $session,
+        string $externalOrderId,
+        ?string $promoCode = null,
+    ): array {
         $items = [];
         $expectedTotal = 0;
 
@@ -353,7 +367,7 @@ class OrderService
 
         $payload = [
             'session_id' => $session['rink_session_id'],
-            'external_order_id' => 'APP-'.Str::lower((string) Str::ulid()),
+            'external_order_id' => $externalOrderId,
             'sale_kind' => (string) config('services.rink_api.sale_kind', 'online'),
             'items' => $items,
             'expected_total' => $expectedTotal,

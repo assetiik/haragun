@@ -35,9 +35,10 @@ class RinkApiException extends Exception
 
     public function render(): JsonResponse
     {
-        return response()->json([
+        return response()->json(array_filter([
             'message' => $this->getMessage(),
             'code' => $this->errorCode,
-        ], $this->status);
+            'details' => $this->details === [] ? null : $this->details,
+        ], fn (mixed $value): bool => $value !== null), $this->status);
     }
 }

@@ -121,8 +121,8 @@ trait ConfiguresRinkApi
                     'order_id' => 'ord_test_hold_1',
                     'status' => 'confirmed',
                     'tickets' => [
-                        ['code' => 'ZYULLQB3QR5ZWZLN5LTT', 'ticket_type' => 'adult', 'price' => 3600, 'full_price' => 4000, 'status' => 'active', 'session_id' => 41, 'can_refund' => true, 'can_move' => true],
-                        ['code' => 'BUH4853QM27CP3455D9A', 'ticket_type' => 'adult', 'price' => 3600, 'full_price' => 4000, 'status' => 'active', 'session_id' => 41, 'can_refund' => true, 'can_move' => true],
+                        ['code' => 'ZYULLQB3QR5ZWZLN5LTT', 'ticket_type' => 'adult', 'price' => 3600, 'full_price' => 4000, 'status' => 'active', 'session_id' => 41, 'can_refund' => false, 'can_move' => false],
+                        ['code' => 'BUH4853QM27CP3455D9A', 'ticket_type' => 'adult', 'price' => 3600, 'full_price' => 4000, 'status' => 'active', 'session_id' => 41, 'can_refund' => false, 'can_move' => false],
                     ],
                 ]),
                 $request->method() === 'POST' && $path === '/api/v1/orders/ord_test_hold_1/confirm' => Http::response([
@@ -143,8 +143,9 @@ trait ConfiguresRinkApi
                     'price' => 4000,
                     'full_price' => 4000,
                     'status' => 'active',
-                    'can_refund' => true,
-                    'can_move' => true,
+                    'can_refund' => false,
+                    'can_move' => false,
+                    'staff_contact' => '+7 700 000 00 00, менеджер (звонки и WhatsApp)',
                     'session_id' => 41,
                     'session' => [
                         'status' => 'open',
@@ -159,8 +160,9 @@ trait ConfiguresRinkApi
                     'price' => 4000,
                     'full_price' => 4000,
                     'status' => 'active',
-                    'can_refund' => true,
-                    'can_move' => true,
+                    'can_refund' => false,
+                    'can_move' => false,
+                    'staff_contact' => '+7 700 000 00 00, менеджер (звонки и WhatsApp)',
                     'session_id' => 41,
                     'session' => [
                         'status' => 'open',
@@ -170,29 +172,21 @@ trait ConfiguresRinkApi
                     ],
                 ]),
                 $request->method() === 'POST' && $path === '/api/v1/tickets/ZYULLQB3QR5ZWZLN5LTT/refund' => Http::response([
-                    'code' => 'ZYULLQB3QR5ZWZLN5LTT',
-                    'ticket_type' => 'adult',
-                    'price' => 4000,
-                    'status' => 'refunded',
-                    'can_refund' => false,
-                    'can_move' => false,
-                    'session_id' => 41,
-                ]),
-                $request->method() === 'POST' && $path === '/api/v1/tickets/ZYULLQB3QR5ZWZLN5LTT/move' => Http::response([
-                    'code' => 'ZYULLQB3QR5ZWZLN5LTT',
-                    'ticket_type' => 'adult',
-                    'price' => 4000,
-                    'status' => 'active',
-                    'can_refund' => true,
-                    'can_move' => true,
-                    'session_id' => (int) ($request['session_id'] ?? 57),
-                    'session' => [
-                        'status' => 'open',
-                        'starts_at' => '2026-02-13T19:00:00+05:00',
-                        'ends_at' => '2026-02-13T21:00:00+05:00',
-                        'entry_opens_at' => '2026-02-13T18:00:00+05:00',
+                    'error' => [
+                        'code' => 'refund_by_staff_only',
+                        'message' => 'Refunds are handled by rink staff.',
+                        'message_ru' => 'Возврат оформляют сотрудники катка.',
+                        'details' => ['staff_contact' => '+7 700 000 00 00, менеджер (звонки и WhatsApp)'],
                     ],
-                ]),
+                ], 403),
+                $request->method() === 'POST' && $path === '/api/v1/tickets/ZYULLQB3QR5ZWZLN5LTT/move' => Http::response([
+                    'error' => [
+                        'code' => 'move_by_staff_only',
+                        'message' => 'Moves are handled by rink staff.',
+                        'message_ru' => 'Перенос оформляют сотрудники катка.',
+                        'details' => ['staff_contact' => '+7 700 000 00 00, менеджер (звонки и WhatsApp)'],
+                    ],
+                ], 403),
                 default => Http::response(['error' => ['code' => 'not_found', 'message' => 'unexpected '.$request->method().' '.$path]], 404),
             };
         });

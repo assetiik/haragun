@@ -18,6 +18,7 @@ class TipTopPayService
 {
     public function __construct(
         private TipTopPayClient $client,
+        private TipTopPayReceiptBuilder $receipts,
     ) {}
 
     public function isEnabled(): bool
@@ -71,7 +72,7 @@ class TipTopPayService
             'public_id' => $this->client->publicId($merchant),
             'amount' => $order->total,
             'currency' => 'KZT',
-            'invoice_id' => (string) $order->id,
+            'invoice_id' => $this->invoiceId($order),
             'account_id' => (string) $order->user_id,
             'description' => $order->summary_title ?: ('Заказ '.$order->code),
             'transaction_id' => $order->tiptop_transaction_id,
@@ -87,17 +88,25 @@ class TipTopPayService
 
         $merchant = $this->requireMerchant($order);
 
-        $response = $this->client->chargeCard([
+        $payload = [
             'Amount' => $order->total,
             'Currency' => 'KZT',
             'IpAddress' => $ipAddress,
             'CardCryptogramPacket' => $cryptogram,
             'Name' => $cardHolderName,
-            'InvoiceId' => (string) $order->id,
+            'InvoiceId' => $this->invoiceId($order),
             'Description' => $order->summary_title ?: ('Заказ '.$order->code),
             'AccountId' => (string) $user->id,
             'CultureName' => 'ru-RU',
-        ], $merchant);
+        ];
+
+        $jsonData = $this->receipts->jsonData($order);
+
+        if ($jsonData !== null) {
+            $payload['JsonData'] = $jsonData;
+        }
+
+        $response = $this->client->chargeCard($payload, $merchant);
 
         return $this->handleChargeResponse($order, $response);
     }
@@ -427,11 +436,24 @@ class TipTopPayService
     {
         $invoiceId = $payload['InvoiceId'] ?? null;
 
-        if (filled($invoiceId) && ctype_digit((string) $invoiceId)) {
-            $order = Order::query()->with('establishment')->find((int) $invoiceId);
+        if (filled($invoiceId)) {
+            $invoice = (string) $invoiceId;
+
+            $order = Order::query()
+                ->with('establishment')
+                ->where('rink_external_order_id', $invoice)
+                ->first();
 
             if ($order !== null) {
                 return $order;
+            }
+
+            if (ctype_digit($invoice)) {
+                $order = Order::query()->with('establishment')->find((int) $invoice);
+
+                if ($order !== null) {
+                    return $order;
+                }
             }
         }
 
@@ -445,6 +467,18 @@ class TipTopPayService
         }
 
         return null;
+    }
+
+    /**
+     * Same value as rink API `external_order_id` for ticket orders; otherwise local order id.
+     */
+    public function invoiceId(Order $order): string
+    {
+        if (filled($order->rink_external_order_id)) {
+            return (string) $order->rink_external_order_id;
+        }
+
+        return (string) $order->id;
     }
 
     private function amountsMatch(Order $order, mixed $amount): bool

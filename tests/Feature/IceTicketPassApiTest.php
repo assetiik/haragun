@@ -25,7 +25,7 @@ class IceTicketPassApiTest extends TestCase
     use ConfiguresRinkApi;
     use RefreshDatabase;
 
-    public function test_refund_pass_calls_rink_and_returns_amount(): void
+    public function test_refund_pass_is_staff_only(): void
     {
         Carbon::setTestNow(Carbon::parse('2026-02-13 12:00:00'));
 
@@ -39,48 +39,15 @@ class IceTicketPassApiTest extends TestCase
         $this->postJson("/api/orders/{$order->id}/passes/ZYULLQB3QR5ZWZLN5LTT/refund", [
             'reason' => 'гость попросил',
         ])
-            ->assertOk()
-            ->assertJsonPath('refunded_amount', 4000)
-            ->assertJsonPath('ticket.status', 'refunded')
-            ->assertJsonPath('message', 'Билет возвращён. Деньги вернутся тем же способом оплаты.');
+            ->assertForbidden()
+            ->assertJsonPath('code', 'refund_by_staff_only')
+            ->assertJsonPath('details.staff_contact', '+7 700 000 00 00, менеджер (звонки и WhatsApp)');
 
-        Http::assertSent(fn (Request $request): bool => $request->method() === 'POST'
-            && parse_url($request->url(), PHP_URL_PATH) === '/api/v1/tickets/ZYULLQB3QR5ZWZLN5LTT/refund'
-            && $request['reason'] === 'гость попросил');
+        Http::assertNotSent(fn (Request $request): bool => $request->method() === 'POST'
+            && parse_url($request->url(), PHP_URL_PATH) === '/api/v1/tickets/ZYULLQB3QR5ZWZLN5LTT/refund');
     }
 
-    public function test_refund_without_reason_sends_json_object_not_array(): void
-    {
-        Carbon::setTestNow(Carbon::parse('2026-02-13 12:00:00'));
-
-        $this->configureRinkApi();
-        $this->fakeRinkApiCatalogAndOrder();
-
-        [$user, $order] = $this->seedOrderWithPasses();
-
-        Sanctum::actingAs($user);
-
-        $this->postJson("/api/orders/{$order->id}/passes/ZYULLQB3QR5ZWZLN5LTT/refund")
-            ->assertOk()
-            ->assertJsonPath('ticket.status', 'refunded');
-
-        Http::assertSent(function (Request $request): bool {
-            if ($request->method() !== 'POST') {
-                return false;
-            }
-
-            if (parse_url($request->url(), PHP_URL_PATH) !== '/api/v1/tickets/ZYULLQB3QR5ZWZLN5LTT/refund') {
-                return false;
-            }
-
-            $body = ltrim($request->body());
-
-            // Must be a JSON object {}, never a JSON array [] (rink API rejects []).
-            return $body === '{}' || str_starts_with($body, '{');
-        });
-    }
-
-    public function test_move_pass_calls_rink_and_keeps_barcode(): void
+    public function test_move_pass_is_staff_only(): void
     {
         Carbon::setTestNow(Carbon::parse('2026-02-13 12:00:00'));
 
@@ -95,15 +62,30 @@ class IceTicketPassApiTest extends TestCase
             'date' => '2026-02-13',
             'time' => '19:00',
         ])
-            ->assertOk()
-            ->assertJsonPath('ticket.code', 'ZYULLQB3QR5ZWZLN5LTT')
-            ->assertJsonPath('ticket.session_id', 57)
-            ->assertJsonPath('order.session.time', '19:00')
-            ->assertJsonPath('order.session.ends_at', '21:00');
+            ->assertForbidden()
+            ->assertJsonPath('code', 'move_by_staff_only');
 
-        Http::assertSent(fn (Request $request): bool => $request->method() === 'POST'
-            && parse_url($request->url(), PHP_URL_PATH) === '/api/v1/tickets/ZYULLQB3QR5ZWZLN5LTT/move'
-            && $request['session_id'] === 57);
+        Http::assertNotSent(fn (Request $request): bool => $request->method() === 'POST'
+            && parse_url($request->url(), PHP_URL_PATH) === '/api/v1/tickets/ZYULLQB3QR5ZWZLN5LTT/move');
+    }
+
+    public function test_order_passes_expose_staff_contact_and_disable_self_service(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-02-13 16:30:00'));
+
+        $this->configureRinkApi();
+        $this->fakeRinkApiCatalogAndOrder();
+
+        [$user, $order] = $this->seedOrderWithPasses(singlePass: true);
+
+        Sanctum::actingAs($user);
+
+        $this->getJson("/api/orders/{$order->id}")
+            ->assertOk()
+            ->assertJsonPath('passes.0.can_refund', false)
+            ->assertJsonPath('passes.0.can_move', false)
+            ->assertJsonPath('passes.0.staff_contact', '+7 700 000 00 00, менеджер (звонки и WhatsApp)')
+            ->assertJsonPath('passes.0.session.status', 'open');
     }
 
     /**
@@ -142,6 +124,7 @@ class IceTicketPassApiTest extends TestCase
             'number' => 4242,
             'code' => 'HRG-4242',
             'rink_order_id' => 'ord_test_hold_1',
+            'rink_external_order_id' => 'APP-01testexternaloid',
             'rink_session_id' => 41,
             'session_date' => '2026-02-13',
             'session_time' => '16:00:00',

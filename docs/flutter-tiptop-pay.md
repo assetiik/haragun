@@ -93,10 +93,17 @@ POST /api/orders
     "required": true,
     "public_id": "pk_…",
     "amount": 8000,
+    "invoice_id": "APP-01j…",
     "…"
   }
 }
 ```
+
+Для билетов катка `payment.invoice_id` = номер заказа в билетной системе (`external_order_id`, вид `APP-…`).  
+Тот же номер уходит в TipTop как `InvoiceId` — каток по нему находит платёж при возврате в ЛК TipTop.  
+Для кофе/корзины `invoice_id` по-прежнему локальный id заказа (число строкой).
+
+Фискальный чек формирует онлайн-касса TipTop: бэкенд при charge передаёт позиции заказа в `JsonData.PaymentData.CustomerReceipt`. Приложению ничего дополнительно слать не нужно.
 
 ---
 
