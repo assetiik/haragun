@@ -15,6 +15,7 @@ use App\Models\Product;
 use App\Models\ProductSize;
 use App\Models\SkateSize;
 use App\Models\User;
+use App\Services\TipTopPay\TipTopPayService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Carbon;
@@ -478,6 +479,44 @@ class TipTopPayApiTest extends TestCase
         ])
             ->assertOk()
             ->assertExactJson(['code' => 13]);
+    }
+
+    public function test_refund_sends_customer_receipt_json_data(): void
+    {
+        $this->configureTipTop();
+
+        [$user, $order] = $this->seedPendingIceVenueOrder();
+        $order->forceFill([
+            'payment_status' => PaymentStatus::Paid,
+            'tiptop_transaction_id' => 999001,
+            'paid_at' => now(),
+        ])->save();
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'api.tiptoppay.test/*' => Http::response([
+                'Success' => true,
+                'Message' => null,
+                'Model' => ['TransactionId' => 999002],
+            ]),
+        ]);
+
+        app(TipTopPayService::class)->refundOrderAmount($order->fresh(), 800);
+
+        Http::assertSent(fn (Request $request): bool => $request->method() === 'POST'
+            && str_contains($request->url(), '/payments/refund')
+            && (int) $request['TransactionId'] === 999001
+            && (int) $request['Amount'] === 800
+            && is_array(data_get($request['JsonData'], 'PaymentData.CustomerReceipt.Items'))
+            && (float) data_get($request['JsonData'], 'PaymentData.CustomerReceipt.Amounts.Electronic') === 800.0);
+
+        $this->assertDatabaseHas('orders', [
+            'id' => $order->id,
+            'payment_status' => PaymentStatus::Refunded->value,
+            'payment_refunded_total' => 800,
+        ]);
+
+        $this->assertSame($user->id, $order->fresh()->user_id);
     }
 
     private function configureTipTop(bool $ice = true, bool $coffee = true): void

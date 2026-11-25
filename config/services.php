@@ -93,8 +93,10 @@ return [
                 'api_secret' => env('TIPTOP_PAY_COFFEE_API_SECRET', env('TIPTOP_PAY_API_SECRET')),
             ],
         ],
-        // Kassir TipTop Pay VAT rate for CustomerReceipt items (null = without VAT).
+        // Kassir TipTop Pay: null Vat = not subject to VAT; 0/5/10/12/16 = rate %.
         'receipt_vat' => env('TIPTOP_PAY_RECEIPT_VAT'),
+        // Optional; omit when the cash register has a single taxation system (0/1/4).
+        'receipt_taxation_system' => env('TIPTOP_PAY_RECEIPT_TAXATION_SYSTEM'),
         'connect_timeout' => 3,
         'timeout' => 30,
     ],

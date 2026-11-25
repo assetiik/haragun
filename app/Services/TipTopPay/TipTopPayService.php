@@ -253,10 +253,18 @@ class TipTopPayService
             return;
         }
 
-        $response = $this->client->refund([
+        $payload = [
             'TransactionId' => (int) $order->tiptop_transaction_id,
             'Amount' => $refundAmount,
-        ], $merchant);
+        ];
+
+        $jsonData = $this->receipts->refundJsonData($order, $refundAmount);
+
+        if ($jsonData !== null) {
+            $payload['JsonData'] = $jsonData;
+        }
+
+        $response = $this->client->refund($payload, $merchant);
 
         if (($response['Success'] ?? false) !== true) {
             throw new TipTopPayException(
