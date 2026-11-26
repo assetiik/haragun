@@ -10,6 +10,7 @@ use App\Models\Order;
 use App\Models\User;
 use App\Services\CoffeeLoyaltyService;
 use App\Services\OrderService;
+use App\Services\WelcomeCoffeeGiftService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -21,6 +22,7 @@ class TipTopPayService
         private TipTopPayClient $client,
         private TipTopPayReceiptBuilder $receipts,
         private CoffeeLoyaltyService $coffeeLoyalty,
+        private WelcomeCoffeeGiftService $welcomeGifts,
     ) {}
 
     public function isEnabled(): bool
@@ -330,6 +332,7 @@ class TipTopPayService
 
             $this->finalizeExternalFulfillment($locked);
             $this->clearCartAfterPayment($locked);
+            $this->welcomeGifts->redeemForPaidOrder($locked);
             $this->coffeeLoyalty->awardForPaidOrder($locked);
 
             return $locked->fresh(['establishment', 'items.product', 'feedback', 'user']) ?? $locked;
@@ -343,7 +346,12 @@ class TipTopPayService
             ->where('establishment_id', $order->establishment_id)
             ->first();
 
-        $cart?->items()->delete();
+        if ($cart === null) {
+            return;
+        }
+
+        $cart->forceFill(['apply_welcome_gift' => false])->save();
+        $cart->items()->delete();
     }
 
     /**

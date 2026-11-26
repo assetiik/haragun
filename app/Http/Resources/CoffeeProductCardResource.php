@@ -25,6 +25,7 @@ class CoffeeProductCardResource extends JsonResource
             'is_popular' => $this->is_popular,
             'is_featured' => $this->is_featured,
             'counts_toward_coffee_card' => (bool) $this->counts_toward_coffee_card,
+            'is_welcome_espresso' => (bool) $this->is_welcome_espresso,
             'category_slug' => $this->menuCategory?->slug,
         ];
     }

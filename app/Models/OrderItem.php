@@ -24,6 +24,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'image_url',
     'is_discount',
     'counts_toward_coffee_card',
+    'is_welcome_gift',
     'sort_order',
 ])]
 class OrderItem extends Model
@@ -44,6 +45,7 @@ class OrderItem extends Model
             'barcodes' => 'array',
             'is_discount' => 'boolean',
             'counts_toward_coffee_card' => 'boolean',
+            'is_welcome_gift' => 'boolean',
             'sort_order' => 'integer',
         ];
     }

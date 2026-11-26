@@ -30,6 +30,7 @@ class OrderItemResource extends JsonResource
             'icon_key' => $this->icon_key,
             'image_url' => StoredUrl::public($this->image_url),
             'is_discount' => $this->is_discount,
+            'is_welcome_gift' => (bool) $this->is_welcome_gift,
         ];
     }
 }

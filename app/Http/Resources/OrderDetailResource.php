@@ -8,6 +8,7 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Services\CoffeeLoyaltyService;
 use App\Services\TipTopPay\TipTopPayService;
+use App\Services\WelcomeCoffeeGiftService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Carbon;
@@ -66,6 +67,7 @@ class OrderDetailResource extends JsonResource
             'promo_discount' => (int) ($this->promo_discount ?? 0),
             'points_to_earn' => $this->points_to_earn,
             'coffee_loyalty' => app(CoffeeLoyaltyService::class)->orderPayload($this->resource),
+            'welcome_gift_applied' => app(WelcomeCoffeeGiftService::class)->orderHasWelcomeGift($this->resource),
             'session' => $this->type === OrderType::Tickets ? [
                 'date' => $this->session_date?->toDateString(),
                 'time' => $this->formattedSessionTime(),

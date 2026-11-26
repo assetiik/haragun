@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'user_id',
     'establishment_id',
     'payment_method',
+    'apply_welcome_gift',
 ])]
 class Cart extends Model
 {
@@ -27,6 +28,7 @@ class Cart extends Model
     {
         return [
             'payment_method' => PaymentMethod::class,
+            'apply_welcome_gift' => 'boolean',
         ];
     }
 

@@ -73,14 +73,22 @@ class CartController extends Controller
     public function update(Request $request, Establishment $establishment): JsonResponse
     {
         $validated = $request->validate([
-            'payment_method' => ['required', 'string', 'in:kaspi'],
+            'payment_method' => ['required_without:apply_welcome_gift', 'string', 'in:kaspi'],
+            'apply_welcome_gift' => ['required_without:payment_method', 'boolean'],
         ]);
 
         $cart = $this->carts->getOrCreate($request->user(), $establishment);
-        $cart = $this->carts->setPaymentMethod(
-            $cart,
-            PaymentMethod::from($validated['payment_method']),
-        );
+
+        if (array_key_exists('payment_method', $validated)) {
+            $cart = $this->carts->setPaymentMethod(
+                $cart,
+                PaymentMethod::from($validated['payment_method']),
+            );
+        }
+
+        if (array_key_exists('apply_welcome_gift', $validated)) {
+            $cart = $this->carts->setApplyWelcomeGift($cart, (bool) $validated['apply_welcome_gift']);
+        }
 
         return (new CartResource($cart))->response()->setStatusCode(200);
     }

@@ -9,12 +9,14 @@ use App\Http\Resources\CityResource;
 use App\Http\Resources\CoffeeLoyaltyResource;
 use App\Http\Resources\PromoTileResource;
 use App\Http\Resources\UserResource;
+use App\Http\Resources\WelcomeCoffeeGiftResource;
 use App\Models\Banner;
 use App\Models\Brand;
 use App\Models\City;
 use App\Models\PromoTile;
 use App\Models\User;
 use App\Services\CoffeeLoyaltyService;
+use App\Services\WelcomeCoffeeGiftService;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -23,7 +25,10 @@ use Illuminate\Support\Facades\Auth;
 #[Group('Home', weight: 0)]
 class HomeController extends Controller
 {
-    public function __construct(private CoffeeLoyaltyService $coffeeLoyalty) {}
+    public function __construct(
+        private CoffeeLoyaltyService $coffeeLoyalty,
+        private WelcomeCoffeeGiftService $welcomeGifts,
+    ) {}
 
     public function __invoke(Request $request): JsonResponse
     {
@@ -88,6 +93,7 @@ class HomeController extends Controller
         /** @var User|null $user */
         $user = Auth::guard('sanctum')->user();
         $loyalty = $this->coffeeLoyalty->progressFor($user);
+        $welcomeGift = $this->welcomeGifts->payloadFor($user);
 
         return response()->json([
             'app_name' => config('app.name'),
@@ -99,6 +105,9 @@ class HomeController extends Controller
             'cafes' => BrandResource::collection($cafes),
             'brands' => BrandResource::collection($brands),
             'coffee_loyalty' => $loyalty !== null ? new CoffeeLoyaltyResource($loyalty) : null,
+            'welcome_gift' => $welcomeGift !== null
+                ? new WelcomeCoffeeGiftResource($welcomeGift)
+                : null,
             'user' => $user ? new UserResource($user) : null,
         ]);
     }

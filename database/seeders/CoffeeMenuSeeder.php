@@ -335,6 +335,7 @@ class CoffeeMenuSeeder extends Seeder
                     'background_color' => $item['background_color'],
                     'is_popular' => $item['is_popular'],
                     'is_featured' => $item['is_featured'],
+                    'is_welcome_espresso' => $item['name'] === 'Эспрессо',
                     'food_section' => $categories[$item['category']]['name'],
                     'icon_key' => 'drink',
                     'is_active' => true,

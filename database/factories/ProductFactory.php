@@ -34,6 +34,7 @@ class ProductFactory extends Factory
             'is_popular' => false,
             'is_featured' => false,
             'counts_toward_coffee_card' => false,
+            'is_welcome_espresso' => false,
             'food_section' => null,
             'icon_key' => null,
             'age_from' => null,

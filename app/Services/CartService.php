@@ -27,6 +27,7 @@ class CartService
     public function __construct(
         private TipTopPayService $tipTopPay,
         private CoffeeLoyaltyService $coffeeLoyalty,
+        private WelcomeCoffeeGiftService $welcomeGifts,
     ) {}
 
     public function getOrCreate(User $user, Establishment $establishment): Cart
@@ -134,6 +135,35 @@ class CartService
         return $this->load($cart->refresh());
     }
 
+    public function setApplyWelcomeGift(Cart $cart, bool $apply): Cart
+    {
+        $cart->loadMissing(['establishment', 'items.product', 'user']);
+
+        if ($apply) {
+            if ($cart->establishment?->type !== EstablishmentType::Coffee) {
+                throw ValidationException::withMessages([
+                    'apply_welcome_gift' => ['Подарок доступен только в кофейнях.'],
+                ]);
+            }
+
+            if ($this->welcomeGifts->availableGiftFor($cart->user) === null) {
+                throw ValidationException::withMessages([
+                    'apply_welcome_gift' => ['Подарочный эспрессо недоступен.'],
+                ]);
+            }
+
+            if (! $this->welcomeGifts->cartHasEligibleEspresso($cart)) {
+                throw ValidationException::withMessages([
+                    'apply_welcome_gift' => ['Добавьте эспрессо в заказ, чтобы применить подарок.'],
+                ]);
+            }
+        }
+
+        $cart->update(['apply_welcome_gift' => $apply]);
+
+        return $this->load($cart->refresh());
+    }
+
     /**
      * @return array{order: Order, cart: Cart}
      */
@@ -154,7 +184,6 @@ class CartService
             $number = $this->nextNumber();
             $now = now();
             $items = $cart->items;
-            $subtotal = $cart->total();
             $loyaltyEligible = $cart->establishment?->type === EstablishmentType::Coffee;
             $lines = $items->map(fn (CartItem $item) => [
                 'product_id' => $item->product_id,
@@ -166,7 +195,15 @@ class CartService
                 'image_url' => $item->product->image_url,
                 'counts_toward_coffee_card' => $loyaltyEligible
                     && (bool) $item->product->counts_toward_coffee_card,
+                'is_welcome_gift' => false,
             ])->all();
+
+            $lines = $this->welcomeGifts->applyGiftToCheckoutLines($cart, $lines);
+            $subtotal = (int) collect($lines)->sum('amount');
+            $itemsCount = (int) collect($lines)->sum('quantity');
+            $giftApplied = collect($lines)->contains(
+                fn (array $line): bool => (bool) ($line['is_welcome_gift'] ?? false)
+            );
 
             if ($awaitingPayment) {
                 $this->abandonUnpaidTipTopOrders((int) $cart->user_id, (int) $cart->establishment_id);
@@ -186,9 +223,9 @@ class CartService
                 'subtotal' => $subtotal,
                 'discount_total' => 0,
                 'total' => $subtotal,
-                'items_count' => $cart->itemsCount(),
+                'items_count' => $itemsCount,
                 'summary_title' => $this->summaryTitle($lines),
-                'summary_short' => $this->summaryShort($cart->itemsCount()),
+                'summary_short' => $this->summaryShort($itemsCount),
                 'payment_label' => $awaitingPayment
                     ? null
                     : ($paymentLabel ?: $cart->payment_method->orderLabel()),
@@ -218,12 +255,18 @@ class CartService
                     'image_url' => $line['image_url'],
                     'is_discount' => false,
                     'counts_toward_coffee_card' => $line['counts_toward_coffee_card'],
+                    'is_welcome_gift' => (bool) ($line['is_welcome_gift'] ?? false),
                     'sort_order' => $index + 1,
                 ]);
             }
 
+            if ($giftApplied) {
+                $this->welcomeGifts->reserveForOrder($cart->user, $order);
+            }
+
             // TipTop: keep cart until payment succeeds. Mock/Kaspi path clears immediately.
             if (! $awaitingPayment) {
+                $cart->forceFill(['apply_welcome_gift' => false])->save();
                 $cart->items()->delete();
             }
 
@@ -231,6 +274,7 @@ class CartService
         });
 
         if (! $awaitingPayment) {
+            $this->welcomeGifts->redeemForPaidOrder($order);
             $this->coffeeLoyalty->awardForPaidOrder($order);
             $order = $order->fresh(['items.product', 'establishment', 'feedback', 'user']) ?? $order;
         }
@@ -251,7 +295,7 @@ class CartService
 
     private function abandonUnpaidTipTopOrders(int $userId, int $establishmentId): void
     {
-        Order::query()
+        $orders = Order::query()
             ->where('user_id', $userId)
             ->where('establishment_id', $establishmentId)
             ->where('type', OrderType::Venue->value)
@@ -261,20 +305,33 @@ class CartService
                 PaymentStatus::Failed->value,
             ])
             ->whereNull('paid_at')
+            ->get(['id']);
+
+        if ($orders->isEmpty()) {
+            return;
+        }
+
+        Order::query()
+            ->whereIn('id', $orders->modelKeys())
             ->update([
                 'status' => OrderStatus::Cancelled->value,
                 'payment_status' => PaymentStatus::Failed->value,
             ]);
+
+        $this->welcomeGifts->releaseForOrders($orders->modelKeys());
     }
 
     /**
-     * @return array{items_count: int, total: int}
+     * @return array{items_count: int, total: int, welcome_gift_discount: int}
      */
     public function summary(?Cart $cart): array
     {
+        $discount = $cart !== null ? $this->welcomeGifts->giftUnitDiscount($cart) : 0;
+
         return [
             'items_count' => $cart?->itemsCount() ?? 0,
-            'total' => $cart?->total() ?? 0,
+            'total' => max(0, ($cart?->total() ?? 0) - $discount),
+            'welcome_gift_discount' => $discount,
         ];
     }
 

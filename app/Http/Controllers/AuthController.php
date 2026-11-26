@@ -5,9 +5,11 @@ namespace App\Http\Controllers;
 use App\Http\Requests\SendCodeRequest;
 use App\Http\Requests\VerifyCodeRequest;
 use App\Http\Resources\UserResource;
+use App\Http\Resources\WelcomeCoffeeGiftResource;
 use App\Models\OtpCode;
 use App\Models\User;
 use App\Services\OtpService;
+use App\Services\WelcomeCoffeeGiftService;
 use Dedoc\Scramble\Attributes\Endpoint;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
@@ -17,7 +19,10 @@ use Illuminate\Support\Facades\DB;
 #[Group('Auth', weight: 1)]
 class AuthController extends Controller
 {
-    public function __construct(private OtpService $otp) {}
+    public function __construct(
+        private OtpService $otp,
+        private WelcomeCoffeeGiftService $welcomeGifts,
+    ) {}
 
     #[Endpoint(title: 'Отправить код', description: 'Шлёт SMS-код на номер телефона.')]
     public function sendCode(SendCodeRequest $request): JsonResponse
@@ -56,13 +61,23 @@ class AuthController extends Controller
             ['name' => null],
         );
 
+        if ($user->wasRecentlyCreated) {
+            $this->welcomeGifts->grantOnFirstRegistration($user);
+        } else {
+            $this->welcomeGifts->rebindToUser($user);
+        }
+
         $token = $user->createToken('flutter')->plainTextToken;
+        $welcomeGift = $this->welcomeGifts->payloadFor($user);
 
         return response()->json([
             'token' => $token,
             'token_type' => 'Bearer',
             'user' => new UserResource($user),
             'needs_name' => blank($user->name),
+            'welcome_gift' => $welcomeGift !== null
+                ? new WelcomeCoffeeGiftResource($welcomeGift)
+                : null,
         ]);
     }
 
@@ -80,6 +95,7 @@ class AuthController extends Controller
         $user = $request->user();
 
         DB::transaction(function () use ($user): void {
+            $this->welcomeGifts->forfeitForDeletedUser($user);
             $user->tokens()->delete();
             OtpCode::query()->where('phone', $user->phone)->delete();
             $user->delete();

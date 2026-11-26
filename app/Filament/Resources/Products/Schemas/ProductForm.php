@@ -335,7 +335,17 @@ class ProductForm
                             ->visible(fn ($livewire): bool => self::isCoffeeForm($livewire))
                             ->dehydrated(fn ($livewire): bool => self::isCoffeeForm($livewire))
                             ->columnSpan([
-                                'md' => 6,
+                                'md' => 3,
+                            ]),
+                        Toggle::make('is_welcome_espresso')
+                            ->label('Welcome эспрессо')
+                            ->helperText('Можно погасить подарок новичка')
+                            ->default(false)
+                            ->inline(false)
+                            ->visible(fn ($livewire): bool => self::isCoffeeForm($livewire))
+                            ->dehydrated(fn ($livewire): bool => self::isCoffeeForm($livewire))
+                            ->columnSpan([
+                                'md' => 3,
                             ]),
                         Select::make('modifiers')
                             ->label('Добавки')

@@ -8,6 +8,7 @@ use App\Http\Requests\QuoteCoffeeItemRequest;
 use App\Http\Resources\CoffeeLoyaltyResource;
 use App\Http\Resources\CoffeeProductCardResource;
 use App\Http\Resources\CoffeeProductDetailResource;
+use App\Http\Resources\WelcomeCoffeeGiftResource;
 use App\Models\Cart;
 use App\Models\Establishment;
 use App\Models\MenuCategory;
@@ -15,6 +16,7 @@ use App\Models\Modifier;
 use App\Models\Product;
 use App\Services\CartService;
 use App\Services\CoffeeLoyaltyService;
+use App\Services\WelcomeCoffeeGiftService;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -26,6 +28,7 @@ class CoffeeMenuController extends Controller
     public function __construct(
         private CartService $carts,
         private CoffeeLoyaltyService $coffeeLoyalty,
+        private WelcomeCoffeeGiftService $welcomeGifts,
     ) {}
 
     public function index(Request $request, Establishment $establishment): JsonResponse
@@ -97,14 +100,18 @@ class CoffeeMenuController extends Controller
         $cartSummary = [
             'items_count' => 0,
             'total' => 0,
+            'welcome_gift_discount' => 0,
         ];
         $activeOrder = null;
         $user = $request->user('sanctum');
         $loyalty = $this->coffeeLoyalty->progressFor($user);
+        $welcomeGift = $establishment->type === EstablishmentType::Coffee
+            ? $this->welcomeGifts->payloadFor($user)
+            : null;
 
         if ($user !== null) {
             $cart = Cart::query()
-                ->with('items')
+                ->with(['items.product', 'establishment', 'user'])
                 ->where('user_id', $user->id)
                 ->where('establishment_id', $establishment->id)
                 ->first();
@@ -128,6 +135,9 @@ class CoffeeMenuController extends Controller
             'featured' => $featured ? new CoffeeProductCardResource($featured) : null,
             'products' => CoffeeProductCardResource::collection($products),
             'coffee_loyalty' => $loyalty !== null ? new CoffeeLoyaltyResource($loyalty) : null,
+            'welcome_gift' => $welcomeGift !== null
+                ? new WelcomeCoffeeGiftResource($welcomeGift)
+                : null,
             'cart' => $cartSummary,
             'active_order' => $activeOrder,
         ]);
