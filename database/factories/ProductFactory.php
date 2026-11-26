@@ -33,6 +33,7 @@ class ProductFactory extends Factory
             'background_color' => null,
             'is_popular' => false,
             'is_featured' => false,
+            'counts_toward_coffee_card' => false,
             'food_section' => null,
             'icon_key' => null,
             'age_from' => null,

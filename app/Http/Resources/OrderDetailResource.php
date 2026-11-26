@@ -6,6 +6,7 @@ use App\Enums\OrderType;
 use App\Enums\ProductKind;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Services\CoffeeLoyaltyService;
 use App\Services\TipTopPay\TipTopPayService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -64,6 +65,7 @@ class OrderDetailResource extends JsonResource
             'promo_code' => $this->promo_code,
             'promo_discount' => (int) ($this->promo_discount ?? 0),
             'points_to_earn' => $this->points_to_earn,
+            'coffee_loyalty' => app(CoffeeLoyaltyService::class)->orderPayload($this->resource),
             'session' => $this->type === OrderType::Tickets ? [
                 'date' => $this->session_date?->toDateString(),
                 'time' => $this->formattedSessionTime(),

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\EstablishmentType;
 use App\Enums\OrderStatus;
 use App\Enums\OrderType;
 use App\Enums\PaymentMethod;
@@ -23,7 +24,10 @@ use Illuminate\Validation\ValidationException;
 
 class CartService
 {
-    public function __construct(private TipTopPayService $tipTopPay) {}
+    public function __construct(
+        private TipTopPayService $tipTopPay,
+        private CoffeeLoyaltyService $coffeeLoyalty,
+    ) {}
 
     public function getOrCreate(User $user, Establishment $establishment): Cart
     {
@@ -151,6 +155,7 @@ class CartService
             $now = now();
             $items = $cart->items;
             $subtotal = $cart->total();
+            $loyaltyEligible = $cart->establishment?->type === EstablishmentType::Coffee;
             $lines = $items->map(fn (CartItem $item) => [
                 'product_id' => $item->product_id,
                 'name' => $item->product->name,
@@ -159,6 +164,8 @@ class CartService
                 'unit_price' => $item->unit_price,
                 'amount' => $item->amount(),
                 'image_url' => $item->product->image_url,
+                'counts_toward_coffee_card' => $loyaltyEligible
+                    && (bool) $item->product->counts_toward_coffee_card,
             ])->all();
 
             if ($awaitingPayment) {
@@ -210,6 +217,7 @@ class CartService
                     'icon_key' => Str::slug($line['name']),
                     'image_url' => $line['image_url'],
                     'is_discount' => false,
+                    'counts_toward_coffee_card' => $line['counts_toward_coffee_card'],
                     'sort_order' => $index + 1,
                 ]);
             }
@@ -221,6 +229,11 @@ class CartService
 
             return $order->load(['items.product', 'establishment', 'feedback', 'user']);
         });
+
+        if (! $awaitingPayment) {
+            $this->coffeeLoyalty->awardForPaidOrder($order);
+            $order = $order->fresh(['items.product', 'establishment', 'feedback', 'user']) ?? $order;
+        }
 
         return [
             'order' => $order,

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\EstablishmentType;
 use App\Enums\MenuCatalog;
 use App\Http\Requests\QuoteCoffeeItemRequest;
+use App\Http\Resources\CoffeeLoyaltyResource;
 use App\Http\Resources\CoffeeProductCardResource;
 use App\Http\Resources\CoffeeProductDetailResource;
 use App\Models\Cart;
@@ -13,6 +14,7 @@ use App\Models\MenuCategory;
 use App\Models\Modifier;
 use App\Models\Product;
 use App\Services\CartService;
+use App\Services\CoffeeLoyaltyService;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,7 +23,10 @@ use Illuminate\Validation\ValidationException;
 #[Group('Coffee', weight: 5)]
 class CoffeeMenuController extends Controller
 {
-    public function __construct(private CartService $carts) {}
+    public function __construct(
+        private CartService $carts,
+        private CoffeeLoyaltyService $coffeeLoyalty,
+    ) {}
 
     public function index(Request $request, Establishment $establishment): JsonResponse
     {
@@ -94,9 +99,10 @@ class CoffeeMenuController extends Controller
             'total' => 0,
         ];
         $activeOrder = null;
+        $user = $request->user('sanctum');
+        $loyalty = $this->coffeeLoyalty->progressFor($user);
 
-        if ($request->user('sanctum') !== null) {
-            $user = $request->user('sanctum');
+        if ($user !== null) {
             $cart = Cart::query()
                 ->with('items')
                 ->where('user_id', $user->id)
@@ -121,6 +127,7 @@ class CoffeeMenuController extends Controller
             'selected_category' => $selectedSlug,
             'featured' => $featured ? new CoffeeProductCardResource($featured) : null,
             'products' => CoffeeProductCardResource::collection($products),
+            'coffee_loyalty' => $loyalty !== null ? new CoffeeLoyaltyResource($loyalty) : null,
             'cart' => $cartSummary,
             'active_order' => $activeOrder,
         ]);

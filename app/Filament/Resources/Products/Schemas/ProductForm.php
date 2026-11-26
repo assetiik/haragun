@@ -327,6 +327,16 @@ class ProductForm
                             ->columnSpan([
                                 'md' => 6,
                             ]),
+                        Toggle::make('counts_toward_coffee_card')
+                            ->label('Кофейная карта')
+                            ->helperText('Засчитывается в кофейную карту')
+                            ->default(false)
+                            ->inline(false)
+                            ->visible(fn ($livewire): bool => self::isCoffeeForm($livewire))
+                            ->dehydrated(fn ($livewire): bool => self::isCoffeeForm($livewire))
+                            ->columnSpan([
+                                'md' => 6,
+                            ]),
                         Select::make('modifiers')
                             ->label('Добавки')
                             ->relationship(

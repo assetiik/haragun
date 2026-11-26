@@ -6,12 +6,15 @@ use App\Enums\EstablishmentType;
 use App\Http\Resources\BannerResource;
 use App\Http\Resources\BrandResource;
 use App\Http\Resources\CityResource;
+use App\Http\Resources\CoffeeLoyaltyResource;
 use App\Http\Resources\PromoTileResource;
 use App\Http\Resources\UserResource;
 use App\Models\Banner;
 use App\Models\Brand;
 use App\Models\City;
 use App\Models\PromoTile;
+use App\Models\User;
+use App\Services\CoffeeLoyaltyService;
 use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -20,6 +23,8 @@ use Illuminate\Support\Facades\Auth;
 #[Group('Home', weight: 0)]
 class HomeController extends Controller
 {
+    public function __construct(private CoffeeLoyaltyService $coffeeLoyalty) {}
+
     public function __invoke(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -80,6 +85,10 @@ class HomeController extends Controller
             ->filter(fn (Brand $brand): bool => $brand->type === EstablishmentType::Coffee)
             ->values();
 
+        /** @var User|null $user */
+        $user = Auth::guard('sanctum')->user();
+        $loyalty = $this->coffeeLoyalty->progressFor($user);
+
         return response()->json([
             'app_name' => config('app.name'),
             'city' => new CityResource($city),
@@ -89,9 +98,8 @@ class HomeController extends Controller
             'haragun' => BrandResource::collection($haragun),
             'cafes' => BrandResource::collection($cafes),
             'brands' => BrandResource::collection($brands),
-            'user' => ($user = Auth::guard('sanctum')->user())
-                ? new UserResource($user)
-                : null,
+            'coffee_loyalty' => $loyalty !== null ? new CoffeeLoyaltyResource($loyalty) : null,
+            'user' => $user ? new UserResource($user) : null,
         ]);
     }
 }

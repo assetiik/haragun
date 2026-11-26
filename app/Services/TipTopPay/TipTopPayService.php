@@ -8,6 +8,7 @@ use App\Exceptions\TipTopPayException;
 use App\Models\Cart;
 use App\Models\Order;
 use App\Models\User;
+use App\Services\CoffeeLoyaltyService;
 use App\Services\OrderService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -19,6 +20,7 @@ class TipTopPayService
     public function __construct(
         private TipTopPayClient $client,
         private TipTopPayReceiptBuilder $receipts,
+        private CoffeeLoyaltyService $coffeeLoyalty,
     ) {}
 
     public function isEnabled(): bool
@@ -227,6 +229,10 @@ class TipTopPayService
                 : PaymentStatus::PartiallyRefunded,
         ])->save();
 
+        if ($refundedTotal >= $order->total) {
+            $this->coffeeLoyalty->reverseForRefundedOrder($order);
+        }
+
         return ['code' => 0];
     }
 
@@ -283,6 +289,10 @@ class TipTopPayService
                 ? PaymentStatus::Refunded
                 : PaymentStatus::PartiallyRefunded,
         ])->save();
+
+        if ($refundedTotal >= $order->total) {
+            $this->coffeeLoyalty->reverseForRefundedOrder($order);
+        }
     }
 
     /**
@@ -320,6 +330,7 @@ class TipTopPayService
 
             $this->finalizeExternalFulfillment($locked);
             $this->clearCartAfterPayment($locked);
+            $this->coffeeLoyalty->awardForPaidOrder($locked);
 
             return $locked->fresh(['establishment', 'items.product', 'feedback', 'user']) ?? $locked;
         });
