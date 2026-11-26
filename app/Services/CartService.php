@@ -184,32 +184,43 @@ class CartService
         }
 
         $cart->loadMissing('establishment');
-        $awaitingPayment = $this->tipTopPay->isEnabledForType($cart->establishment?->type);
 
-        $order = DB::transaction(function () use ($cart, $paymentLabel, $awaitingPayment) {
+        $loyaltyEligible = $cart->establishment?->type === EstablishmentType::Coffee;
+        $lines = $cart->items->map(fn (CartItem $item) => [
+            'product_id' => $item->product_id,
+            'name' => $item->product->name,
+            'subtitle' => $item->subtitle(),
+            'quantity' => $item->quantity,
+            'unit_price' => $item->unit_price,
+            'amount' => $item->amount(),
+            'image_url' => $item->product->image_url,
+            'counts_toward_coffee_card' => $loyaltyEligible
+                && (bool) $item->product->counts_toward_coffee_card,
+            'is_welcome_gift' => false,
+        ])->all();
+
+        $lines = $this->welcomeGifts->applyGiftToCheckoutLines($cart, $lines);
+        $subtotal = (int) collect($lines)->sum('amount');
+        $itemsCount = (int) collect($lines)->sum('quantity');
+        $giftApplied = collect($lines)->contains(
+            fn (array $line): bool => (bool) ($line['is_welcome_gift'] ?? false)
+        );
+
+        // Zero-total orders (e.g. only welcome espresso) skip TipTop and are paid immediately.
+        $awaitingPayment = $subtotal > 0
+            && $this->tipTopPay->isEnabledForType($cart->establishment?->type);
+
+        $order = DB::transaction(function () use (
+            $cart,
+            $paymentLabel,
+            $awaitingPayment,
+            $lines,
+            $subtotal,
+            $itemsCount,
+            $giftApplied,
+        ) {
             $number = $this->nextNumber();
             $now = now();
-            $items = $cart->items;
-            $loyaltyEligible = $cart->establishment?->type === EstablishmentType::Coffee;
-            $lines = $items->map(fn (CartItem $item) => [
-                'product_id' => $item->product_id,
-                'name' => $item->product->name,
-                'subtitle' => $item->subtitle(),
-                'quantity' => $item->quantity,
-                'unit_price' => $item->unit_price,
-                'amount' => $item->amount(),
-                'image_url' => $item->product->image_url,
-                'counts_toward_coffee_card' => $loyaltyEligible
-                    && (bool) $item->product->counts_toward_coffee_card,
-                'is_welcome_gift' => false,
-            ])->all();
-
-            $lines = $this->welcomeGifts->applyGiftToCheckoutLines($cart, $lines);
-            $subtotal = (int) collect($lines)->sum('amount');
-            $itemsCount = (int) collect($lines)->sum('quantity');
-            $giftApplied = collect($lines)->contains(
-                fn (array $line): bool => (bool) ($line['is_welcome_gift'] ?? false)
-            );
 
             if ($awaitingPayment) {
                 $this->abandonUnpaidTipTopOrders((int) $cart->user_id, (int) $cart->establishment_id);
@@ -234,7 +245,9 @@ class CartService
                 'summary_short' => $this->summaryShort($itemsCount),
                 'payment_label' => $awaitingPayment
                     ? null
-                    : ($paymentLabel ?: $cart->payment_method->orderLabel()),
+                    : ($subtotal === 0
+                        ? 'Подарок'
+                        : ($paymentLabel ?: $cart->payment_method->orderLabel())),
                 'payment_status' => $awaitingPayment ? PaymentStatus::Pending : PaymentStatus::Paid,
                 'payment_provider' => $awaitingPayment ? 'tiptop' : null,
                 'points_to_earn' => (int) floor($subtotal / 20),

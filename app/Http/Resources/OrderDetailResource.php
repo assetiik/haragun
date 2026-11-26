@@ -23,6 +23,10 @@ class OrderDetailResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        if ((int) $this->total <= 0 && ($this->payment_status?->canCharge() ?? false)) {
+            $this->resource = app(TipTopPayService::class)->settleZeroTotalOrder($this->resource);
+        }
+
         $lat = $request->query('lat');
         $lng = $request->query('lng');
         $latitude = is_numeric($lat) ? (float) $lat : null;

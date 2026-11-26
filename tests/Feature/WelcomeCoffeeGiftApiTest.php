@@ -140,6 +140,45 @@ class WelcomeCoffeeGiftApiTest extends TestCase
             ->assertJsonPath('welcome_gift.available', false);
     }
 
+    public function test_zero_total_gift_only_checkout_is_paid_without_tiptop(): void
+    {
+        config([
+            'services.tiptop_pay.enabled' => true,
+            'services.tiptop_pay.public_id' => null,
+            'services.tiptop_pay.api_secret' => null,
+            'services.tiptop_pay.merchants.coffee.public_id' => 'pk_coffee_test',
+            'services.tiptop_pay.merchants.coffee.api_secret' => 'coffee_api_secret',
+        ]);
+
+        [$user, $establishment, $espresso, , $espressoSize] = $this->seedCoffeeWithGift();
+
+        Sanctum::actingAs($user);
+
+        $this->postJson("/api/establishments/{$establishment->id}/cart/items", [
+            'product_id' => $espresso->id,
+            'size_id' => $espressoSize->id,
+            'quantity' => 1,
+        ])->assertOk();
+
+        $this->patchJson("/api/establishments/{$establishment->id}/cart", [
+            'apply_welcome_gift' => true,
+        ])->assertOk();
+
+        $this->postJson("/api/establishments/{$establishment->id}/cart/checkout")
+            ->assertCreated()
+            ->assertJsonPath('order.total', 0)
+            ->assertJsonPath('order.payment_status', 'paid')
+            ->assertJsonPath('order.payment_label', 'Подарок')
+            ->assertJsonPath('order.welcome_gift_applied', true)
+            ->assertJsonPath('payment', null)
+            ->assertJsonPath('coffee_screen.screen', 'accepted');
+
+        $this->assertDatabaseHas('welcome_coffee_gifts', [
+            'user_id' => $user->id,
+            'status' => WelcomeCoffeeGift::STATUS_REDEEMED,
+        ]);
+    }
+
     public function test_welcome_gift_does_not_count_toward_coffee_card(): void
     {
         [$user, $establishment, $espresso, , $espressoSize] = $this->seedCoffeeWithGift();

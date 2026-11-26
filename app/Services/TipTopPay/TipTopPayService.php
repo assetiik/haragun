@@ -55,6 +55,10 @@ class TipTopPayService
      */
     public function paymentPayload(Order $order): ?array
     {
+        if ((int) $order->total <= 0) {
+            return null;
+        }
+
         if (! $this->isEnabled() || ! $this->appliesTo($order)) {
             return null;
         }
@@ -81,6 +85,46 @@ class TipTopPayService
             'description' => $order->summary_title ?: ('Заказ '.$order->code),
             'transaction_id' => $order->tiptop_transaction_id,
         ];
+    }
+
+    /**
+     * Free / gift-only orders never go through TipTop.
+     */
+    public function settleZeroTotalOrder(Order $order): Order
+    {
+        if ((int) $order->total > 0) {
+            return $order;
+        }
+
+        if ($order->payment_status === PaymentStatus::Paid && filled($order->paid_at)) {
+            return $order->fresh(['establishment', 'items.product', 'feedback', 'user']) ?? $order;
+        }
+
+        return DB::transaction(function () use ($order) {
+            /** @var Order $locked */
+            $locked = Order::query()->whereKey($order->id)->lockForUpdate()->firstOrFail();
+
+            if ($locked->payment_status === PaymentStatus::Paid && filled($locked->paid_at)) {
+                return $locked->fresh(['establishment', 'items.product', 'feedback', 'user']) ?? $locked;
+            }
+
+            $now = now();
+
+            $locked->forceFill([
+                'payment_status' => PaymentStatus::Paid,
+                'payment_provider' => null,
+                'payment_label' => $locked->payment_label ?: 'Подарок',
+                'paid_at' => $locked->paid_at ?? $now,
+                'accepted_at' => $locked->accepted_at ?? $now,
+            ])->save();
+
+            $this->finalizeExternalFulfillment($locked);
+            $this->clearCartAfterPayment($locked);
+            $this->welcomeGifts->redeemForPaidOrder($locked);
+            $this->coffeeLoyalty->awardForPaidOrder($locked);
+
+            return $locked->fresh(['establishment', 'items.product', 'feedback', 'user']) ?? $locked;
+        });
     }
 
     /**
