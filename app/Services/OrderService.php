@@ -51,7 +51,9 @@ class OrderService
         $ticketLines = collect($quote['lines'])
             ->filter(fn (array $line): bool => $line['kind'] === ProductKind::Ticket->value && ! $line['is_discount']);
 
-        $awaitingPayment = $this->tipTopPay->isEnabledForType($establishment->type);
+        // Zero-total orders (full promo / free items) skip TipTop and settle immediately.
+        $awaitingPayment = (int) $quote['total'] > 0
+            && $this->tipTopPay->isEnabledForType($establishment->type);
 
         $slot = null;
         $session = null;
@@ -114,7 +116,9 @@ class OrderService
                     'summary_short' => $this->summaryShort($quote['lines']),
                     'payment_label' => $awaitingPayment
                         ? null
-                        : ($payload['payment_label'] ?? 'Kaspi Gold · 4417'),
+                        : ((int) $quote['total'] <= 0
+                            ? (filled($quote['promo_code'] ?? null) ? 'Промокод' : 'Бесплатно')
+                            : ($payload['payment_label'] ?? 'Kaspi Gold · 4417')),
                     'payment_status' => $awaitingPayment ? PaymentStatus::Pending : PaymentStatus::Paid,
                     'payment_provider' => $awaitingPayment ? 'tiptop' : null,
                     'promo_code' => $quote['promo_code'] ?? null,

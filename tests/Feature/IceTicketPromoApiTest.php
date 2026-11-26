@@ -71,6 +71,60 @@ class IceTicketPromoApiTest extends TestCase
             ]);
     }
 
+    public function test_zero_total_promo_skips_tiptop_and_confirms_immediately(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-02-13 12:00:00'));
+
+        $this->configureRinkApi();
+        $this->fakeRinkApiCatalogAndOrder(promoResponse: [
+            'code' => 'FREE100',
+            'name' => 'Free 100%',
+            'kind' => 'percent',
+            'value' => 100,
+            'ticket_types' => null,
+            'remaining' => 100,
+            'prices' => [
+                [
+                    'ticket_type' => 'adult',
+                    'name' => ['ru' => 'Взрослый', 'en' => 'Adult'],
+                    'full_price' => 4000,
+                    'price' => 0,
+                    'discounted' => true,
+                ],
+            ],
+        ]);
+
+        config([
+            'services.tiptop_pay.enabled' => true,
+            'services.tiptop_pay.public_id' => null,
+            'services.tiptop_pay.api_secret' => null,
+            'services.tiptop_pay.merchants.ice.public_id' => 'pk_ice_test',
+            'services.tiptop_pay.merchants.ice.api_secret' => 'ice_api_secret',
+            'services.tiptop_pay.merchants.coffee.public_id' => null,
+            'services.tiptop_pay.merchants.coffee.api_secret' => null,
+        ]);
+
+        [$user, $arena, $adult] = $this->seedArena();
+
+        Sanctum::actingAs($user);
+
+        $this->postJson('/api/orders', [
+            'establishment_id' => $arena->id,
+            'date' => '2026-02-13',
+            'time' => '16:00',
+            'promo_code' => 'FREE100',
+            'items' => [
+                ['product_id' => $adult->id, 'quantity' => 1],
+            ],
+        ])
+            ->assertCreated()
+            ->assertJsonPath('order.total', 0)
+            ->assertJsonPath('order.payment_status', 'paid')
+            ->assertJsonPath('order.payment_label', 'Промокод')
+            ->assertJsonPath('order.promo_code', 'FREE100')
+            ->assertJsonPath('payment', null);
+    }
+
     /**
      * @return array{0: User, 1: Establishment, 2: Product}
      */

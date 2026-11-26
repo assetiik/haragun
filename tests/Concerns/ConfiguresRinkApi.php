@@ -18,11 +18,39 @@ trait ConfiguresRinkApi
         ]);
     }
 
-    private function fakeRinkApiCatalogAndOrder(bool $confirmSucceeds = true): void
+    /**
+     * @param  array<string, mixed>|null  $promoResponse
+     */
+    private function fakeRinkApiCatalogAndOrder(bool $confirmSucceeds = true, ?array $promoResponse = null): void
     {
         Http::preventStrayRequests();
 
-        Http::fake(function (Request $request) use ($confirmSucceeds) {
+        $promoResponse ??= [
+            'code' => 'TEST10',
+            'name' => 'Test 10%',
+            'kind' => 'percent',
+            'value' => 10,
+            'ticket_types' => null,
+            'remaining' => 100,
+            'prices' => [
+                [
+                    'ticket_type' => 'child',
+                    'name' => ['ru' => 'Детский', 'en' => 'Child'],
+                    'full_price' => 2000,
+                    'price' => 1800,
+                    'discounted' => true,
+                ],
+                [
+                    'ticket_type' => 'adult',
+                    'name' => ['ru' => 'Взрослый', 'en' => 'Adult'],
+                    'full_price' => 4000,
+                    'price' => 3600,
+                    'discounted' => true,
+                ],
+            ],
+        ];
+
+        Http::fake(function (Request $request) use ($confirmSucceeds, $promoResponse) {
             $path = (string) parse_url($request->url(), PHP_URL_PATH);
             $date = (string) ($request['date'] ?? '2026-02-13');
 
@@ -84,29 +112,8 @@ trait ConfiguresRinkApi
                     ],
                 ]),
                 $request->method() === 'GET' && str_starts_with($path, '/api/v1/promo-codes/') => Http::response([
-                    'code' => 'TEST10',
-                    'name' => 'Test 10%',
-                    'kind' => 'percent',
-                    'value' => 10,
-                    'ticket_types' => null,
-                    'remaining' => 100,
+                    ...$promoResponse,
                     'session_id' => (int) ($request['session_id'] ?? 41),
-                    'prices' => [
-                        [
-                            'ticket_type' => 'child',
-                            'name' => ['ru' => 'Детский', 'en' => 'Child'],
-                            'full_price' => 2000,
-                            'price' => 1800,
-                            'discounted' => true,
-                        ],
-                        [
-                            'ticket_type' => 'adult',
-                            'name' => ['ru' => 'Взрослый', 'en' => 'Adult'],
-                            'full_price' => 4000,
-                            'price' => 3600,
-                            'discounted' => true,
-                        ],
-                    ],
                 ]),
                 $request->method() === 'POST' && $path === '/api/v1/orders' => Http::response([
                     'order_id' => 'ord_test_hold_1',
@@ -121,7 +128,7 @@ trait ConfiguresRinkApi
                     'order_id' => 'ord_test_hold_1',
                     'status' => 'confirmed',
                     'tickets' => [
-                        ['code' => 'ZYULLQB3QR5ZWZLN5LTT', 'ticket_type' => 'adult', 'price' => 3600, 'full_price' => 4000, 'status' => 'active', 'session_id' => 41, 'can_refund' => false, 'can_move' => false],
+                        ['code' => 'ZYULLQB3QR5ZWZLN5LTT', 'ticket_type' => 'adult', 'price' => 0, 'full_price' => 4000, 'status' => 'active', 'session_id' => 41, 'can_refund' => false, 'can_move' => false],
                         ['code' => 'BUH4853QM27CP3455D9A', 'ticket_type' => 'adult', 'price' => 3600, 'full_price' => 4000, 'status' => 'active', 'session_id' => 41, 'can_refund' => false, 'can_move' => false],
                     ],
                 ]),

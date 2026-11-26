@@ -10,6 +10,17 @@
 
 Пока TipTop выключен / нет ключей для типа заведения — заказ сразу `paid`, `payment = null`.
 
+### Заказ на 0 ₸ (везде)
+
+Если `order.total === 0` (welcome-подарок, полный промокод и т.п.):
+
+- сразу `payment_status: "paid"`
+- `payment: null`
+- TipTop / ввод карты **не** открывать
+- билеты сразу confirm (есть passes / barcodes), еда — сразу активный заказ
+
+Правило для клиента: `total === 0` **или** `payment == null` / `payment.required !== true` → не показывать оплату картой.
+
 ---
 
 ## Поток (важно)
@@ -21,11 +32,15 @@
 3. Только после успешной оплаты: `payment_status=paid`, корзина очищается.  
    Для `coffee` появляется `coffee_screen`; для катка `coffee_screen` обычно `null`.
 
+Исключение: `total === 0` → сразу `paid`, шаг 2 пропускается.
+
 ### Билеты / аренда (каток)
 
 1. `POST /api/orders` → заказ `payment_status=pending`, бронь **ещё не confirm**, QR/passes без кодов, `is_active=false`.
 2. `POST .../payments/charge` (+ 3DS).
 3. После оплаты: confirm билетов, появляются `passes` / barcodes, `is_active=true`.
+
+Исключение: `total === 0` (например 100% промо) → сразу `paid` + confirm, без TipTop.
 
 При отказе / отмене / незавершённом 3DS: заказ не активен. Новый заказ того же пользователя на то же заведение отменяет предыдущий неоплаченный TipTop-заказ.
 

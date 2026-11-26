@@ -88,16 +88,18 @@ Content-Type: application/json
 
 Обычный `POST .../cart/checkout`. Если `apply_welcome_gift` был включён:
 
-### Заказ на 0 ₸ (только подарок)
+### Заказ на 0 ₸ (подарок, промокод и т.п.)
 
-Карту **не** спрашивать. На checkout бэк сразу ставит:
+Правило **общее** для кофейни и катка: см. `docs/flutter-tiptop-pay.md`.
+
+Карту **не** спрашивать. На checkout / `POST /api/orders` бэк сразу ставит:
 
 - `payment_status: "paid"`
-- `payment_label: "Подарок"`
 - `payment: null`
-- `coffee_screen` — как после обычной оплаты
+- для welcome-эспрессо — `payment_label: "Подарок"`, есть `coffee_screen`
+- для полного промо на билеты — `payment_label: "Промокод"`, билеты сразу confirm
 
-Если `order.total === 0` или `payment == null` / `payment.required != true` — не открывать TipTop, сразу экран заказа / штрихкод для бармена.
+Если `order.total === 0` или `payment == null` / `payment.required != true` — не открывать TipTop.
 
 Старые «залипшие» заказы на 0 ₸ с `pending` при открытии заказа тоже автоматически становятся `paid`.
 
