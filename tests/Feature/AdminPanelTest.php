@@ -112,6 +112,7 @@ class AdminPanelTest extends TestCase
             ->assertSee('tab=haragun-skates', false)
             ->assertSee('tab=cafes', false)
             ->assertSee('Кофейни')
+            ->assertSee('Подарок при регистрации')
             ->assertSee('Добавки')
             ->assertDontSee(BrandResource::getUrl().'?tab=haragun', false)
             ->assertDontSee('Размеры')

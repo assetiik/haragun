@@ -77,6 +77,15 @@ class ProductsTable
                 IconColumn::make('is_active')
                     ->label('Активен')
                     ->boolean(),
+                IconColumn::make('is_welcome_espresso')
+                    ->label('Подарок')
+                    ->boolean()
+                    ->trueIcon('heroicon-o-gift')
+                    ->visible(fn (): bool => in_array(
+                        VenueSection::fromRequest(),
+                        [VenueSection::Cafes, VenueSection::HaragunCafe],
+                        true,
+                    )),
                 TextColumn::make('sort_order')
                     ->label('#')
                     ->sortable()
@@ -84,6 +93,13 @@ class ProductsTable
             ])
             ->filters([
                 TernaryFilter::make('is_active')->label('Активные'),
+                TernaryFilter::make('is_welcome_espresso')
+                    ->label('Подарок при регистрации')
+                    ->visible(fn (): bool => in_array(
+                        VenueSection::fromRequest(),
+                        [VenueSection::Cafes, VenueSection::HaragunCafe],
+                        true,
+                    )),
             ])
             ->recordActions([
                 EditAction::make()

@@ -56,6 +56,20 @@ class Product extends Model
 
     use HasI18n;
 
+    protected static function booted(): void
+    {
+        static::saved(function (Product $product): void {
+            if (! $product->is_welcome_espresso) {
+                return;
+            }
+
+            static::query()
+                ->whereKeyNot($product->id)
+                ->where('is_welcome_espresso', true)
+                ->update(['is_welcome_espresso' => false]);
+        });
+    }
+
     /**
      * @return list<string>
      */
