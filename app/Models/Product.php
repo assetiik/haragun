@@ -44,6 +44,7 @@ use Illuminate\Support\Carbon;
     'icon_key',
     'age_from',
     'is_active',
+    'stock_quantity',
     'sort_order',
     'iiko_product_id',
     'i18n',
@@ -81,9 +82,46 @@ class Product extends Model
             'counts_toward_coffee_card' => 'boolean',
             'is_welcome_espresso' => 'boolean',
             'is_active' => 'boolean',
+            'stock_quantity' => 'integer',
             'sort_order' => 'integer',
             'i18n' => 'array',
         ];
+    }
+
+    public function tracksStock(): bool
+    {
+        return $this->stock_quantity !== null;
+    }
+
+    public function inStock(): bool
+    {
+        if (! $this->tracksStock()) {
+            return true;
+        }
+
+        return (int) $this->stock_quantity > 0;
+    }
+
+    public function availableQuantity(): ?int
+    {
+        if (! $this->tracksStock()) {
+            return null;
+        }
+
+        return max(0, (int) $this->stock_quantity);
+    }
+
+    public function canFulfillQuantity(int $quantity): bool
+    {
+        if ($quantity < 1) {
+            return false;
+        }
+
+        if (! $this->tracksStock()) {
+            return true;
+        }
+
+        return (int) $this->stock_quantity >= $quantity;
     }
 
     public function establishment(): BelongsTo

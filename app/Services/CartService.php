@@ -80,9 +80,12 @@ class CartService
             ->where('signature', $signature)
             ->first();
 
+        $desiredQuantity = min(20, ($existing?->quantity ?? 0) + $quantity);
+        $this->assertProductStock($priced['product'], $desiredQuantity);
+
         if ($existing !== null) {
             $existing->update([
-                'quantity' => min(20, $existing->quantity + $quantity),
+                'quantity' => $desiredQuantity,
                 'unit_price' => $priced['unit_price'],
             ]);
         } else {
@@ -92,7 +95,7 @@ class CartService
                 'product_size_id' => $priced['size']?->id,
                 'modifier_ids' => $priced['modifier_ids'],
                 'signature' => $signature,
-                'quantity' => min(20, $quantity),
+                'quantity' => $desiredQuantity,
                 'unit_price' => $priced['unit_price'],
             ]);
         }
@@ -107,7 +110,10 @@ class CartService
         if ($quantity <= 0) {
             $item->delete();
         } else {
-            $item->update(['quantity' => min(20, $quantity)]);
+            $item->loadMissing('product');
+            $desiredQuantity = min(20, $quantity);
+            $this->assertProductStock($item->product, $desiredQuantity);
+            $item->update(['quantity' => $desiredQuantity]);
         }
 
         return $this->load($cart->refresh());
@@ -520,5 +526,26 @@ class CartService
     private function ensureItemBelongs(Cart $cart, CartItem $item): void
     {
         abort_unless($item->cart_id === $cart->id, 404);
+    }
+
+    private function assertProductStock(?Product $product, int $quantity): void
+    {
+        if ($product === null) {
+            throw ValidationException::withMessages([
+                'product_id' => ['Товар недоступен.'],
+            ]);
+        }
+
+        if (! $product->inStock()) {
+            throw ValidationException::withMessages([
+                'product_id' => ['Нет в наличии.'],
+            ]);
+        }
+
+        if (! $product->canFulfillQuantity($quantity)) {
+            throw ValidationException::withMessages([
+                'quantity' => ["Доступно только {$product->availableQuantity()} шт."],
+            ]);
+        }
     }
 }

@@ -35,6 +35,8 @@ class CoffeeProductDetailResource extends JsonResource
             'background_color' => $this->background_color ?? '#C8A45D',
             'counts_toward_coffee_card' => (bool) $this->counts_toward_coffee_card,
             'is_welcome_espresso' => (bool) $this->is_welcome_espresso,
+            'stock_quantity' => $this->availableQuantity(),
+            'in_stock' => $this->inStock(),
             'selection_mode' => $isFoodCourt ? 'quantity' : 'coffee',
             'base_price' => $this->price,
             'default_size_id' => $isFoodCourt ? null : $defaultSize?->id,

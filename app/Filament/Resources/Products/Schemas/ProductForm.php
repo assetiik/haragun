@@ -63,6 +63,18 @@ class ProductForm
                             ->columnSpan([
                                 'md' => 2,
                             ]),
+                        TextInput::make('stock_quantity')
+                            ->label('Остаток')
+                            ->numeric()
+                            ->integer()
+                            ->minValue(0)
+                            ->nullable()
+                            ->helperText('Пусто = без лимита. 0 = нет в наличии')
+                            ->visible(fn ($livewire): bool => self::isCoffeeForm($livewire) || self::isMealsForm($livewire))
+                            ->dehydrated(fn ($livewire): bool => self::isCoffeeForm($livewire) || self::isMealsForm($livewire))
+                            ->columnSpan([
+                                'md' => 3,
+                            ]),
                         ...LocalizedFields::text('name', 'Название'),
                         Select::make('brand_id')
                             ->label('Бренд')

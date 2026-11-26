@@ -26,6 +26,8 @@ class FoodProductResource extends JsonResource
             'food_section' => $this->food_section,
             'icon_key' => $this->icon_key,
             'image_url' => $this->publicImageUrl(),
+            'stock_quantity' => $this->availableQuantity(),
+            'in_stock' => $this->inStock(),
             'selection_mode' => 'quantity',
             'sizes' => [],
             'modifiers' => [],

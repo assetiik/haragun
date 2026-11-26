@@ -39,6 +39,7 @@ class ProductFactory extends Factory
             'icon_key' => null,
             'age_from' => null,
             'is_active' => true,
+            'stock_quantity' => null,
             'sort_order' => 0,
         ];
     }
